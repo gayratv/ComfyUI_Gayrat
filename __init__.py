@@ -1,6 +1,6 @@
-# GoogleTranslateNode/__init__.py
+# ComfyUI_Custom_Nodes_Gayrat/GoogleTranslateNode/__init__.py
 
-from .google_translate_node import GoogleTranslateCLIPTextEncodeNode, GoogleTranslateTextNode
+from GoogleTranslateNode.google_translate_node import GoogleTranslateCLIPTextEncodeNode, GoogleTranslateTextNode
 
 # Список узлов, которые будут зарегистрированы в ComfyUI
 NODE_CLASS_MAPPINGS = {
