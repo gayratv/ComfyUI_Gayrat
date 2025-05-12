@@ -1,13 +1,13 @@
 [project]
-name = "comfyui_custom_nodes_alekpet"
-description = "Nodes: PoseNode, PainterNode, TranslateTextNode, TranslateCLIPTextEncodeNode, DeepTranslatorTextNode, DeepTranslatorCLIPTextEncodeNode, ArgosTranslateTextNode, ArgosTranslateCLIPTextEncodeNode, ChatGLM4TranslateCLIPTextEncodeNode, ChatGLM4TranslateTextNode, ChatGLM4InstructNode, ChatGLM4InstructMediaNode, DeepLXTranslateTextNode, DeepLXTranslateCLIPTextEncodeNode, PreviewTextNode, HexToHueNode, ColorsCorrectNode, IDENode."
-version = "1.0.65"
+name = "comfyui_custom_nodes_gayrat"
+description = "Nodes:GoogleTranslate."
+version = "1.0.0"
 license = { file = "LICENSE" }
 
 [project.urls]
-Repository = "https://github.com/AlekPet/ComfyUI_Custom_Nodes_AlekPet"
+Repository = "https://github.com/gayratv/ComfyUI_Custom_Nodes_Gayrat"
 
 [tool.comfy]
-PublisherId = "alekpet"
-DisplayName = "ComfyUI_Custom_Nodes_AlekPet"
+PublisherId = "gayrat"
+DisplayName = "ComfyUI_Custom_Nodes_Gayrat"
 Icon = ""

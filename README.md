@@ -1,3 +1,6 @@
+#fork from 
+https://github.com/AlekPet/ComfyUI_Custom_Nodes_AlekPet
+
 # ComfyUI Custom Nodes
 
 Custom nodes that extend the capabilities of [ComfyUI](https://github.com/comfyanonymous/ComfyUI)

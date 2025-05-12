@@ -1,55 +1,9 @@
-import os
-import requests
-import json
-from server import PromptServer
-from aiohttp import web
 from googletrans import Translator, LANGUAGES
+# импорт из Comfy
+from server import PromptServer
 
 ### =====  GoogleTranslate Nodes [googletrans module]  ===== ###
 translator = Translator()
-
-google_translation_key = os.environ.get("GOOGLE_TRANSLATION_API_KEY")
-
-
-# Manual tranlsate prompts
-@PromptServer.instance.routes.post("/alekpet/translate_manual")
-async def translate_manual(request):
-    json_data = await request.json()
-    prompt = json_data.get("prompt", "")
-
-    if "prompt" in json_data and "srcTrans" in json_data and "toTrans" in json_data:
-        prompt = json_data.get("prompt")
-        srcTrans = json_data.get("srcTrans")
-        toTrans = json_data.get("toTrans")
-
-        translate_text_prompt = translate(prompt, srcTrans, toTrans)
-
-        return web.json_response({"translate_prompt": translate_text_prompt})
-
-    return web.json_response({"translate_prompt": prompt})
-
-
-# Translate used Google API_KEY
-class TranslationResult:
-    def __init__(self, text=""):
-        self.text = text
-
-    def translate_by_key(text, src, dest):
-        url = f"https://translation.googleapis.com/language/translate/v2?key={google_translation_key}"
-
-        data = {"q": text, "target": dest}
-
-        resp = requests.post(url, data=data)
-        resp_data = json.loads(resp.text)
-
-        if "translations" in resp_data.get("data", {}):
-            translations = resp_data["data"]["translations"]
-            if translations:
-                translated_text = translations[0]["translatedText"]
-                return TranslationResult(translated_text)
-
-        return TranslationResult("")
-
 
 def translate(prompt, srcTrans=None, toTrans=None):
     if not srcTrans:
@@ -60,14 +14,9 @@ def translate(prompt, srcTrans=None, toTrans=None):
 
     translate_text_prompt = ""
     if prompt and prompt.strip() != "":
-        if not google_translation_key:
-            translate_text_prompt = translator.translate(
-                prompt, src=srcTrans, dest=toTrans
-            )
-        else:
-            translate_text_prompt = TranslationResult.translate_by_key(
-                prompt, src=srcTrans, dest=toTrans
-            )
+        translate_text_prompt = translator.translate(
+            prompt, src=srcTrans, dest=toTrans
+        )
 
     return translate_text_prompt.text if hasattr(translate_text_prompt, "text") else ""
 
@@ -95,7 +44,7 @@ class GoogleTranslateCLIPTextEncodeNode:
     )
     FUNCTION = "translate_text"
     DESCRIPTION = "This is a node that translates the prompt into another language using Google Translate."
-    CATEGORY = "AlekPet Nodes/conditioning"
+    CATEGORY = "Gyarat Nodes/conditioning"
 
     def translate_text(self, **kwargs):
         from_translate = kwargs.get("from_translate")
@@ -126,7 +75,7 @@ class GoogleTranslateTextNode(GoogleTranslateCLIPTextEncodeNode):
     RETURN_NAMES = ("text",)
     FUNCTION = "translate_text"
 
-    CATEGORY = "AlekPet Nodes/text"
+    CATEGORY = "Gayrat Nodes/text"
 
     def translate_text(self, **kwargs):
         from_translate = kwargs.get("from_translate")
