@@ -1,24 +1,58 @@
 from googletrans import Translator, LANGUAGES
+import asyncio
 # импорт из Comfy
 from server import PromptServer
 
 ### =====  GoogleTranslate Nodes [googletrans module]  ===== ###
 translator = Translator()
 
-def translate(prompt, srcTrans=None, toTrans=None):
+
+async def translate(prompt, srcTrans=None, toTrans=None):
+    """
+    Асинхронная функция для перевода текста с использованием Google Translate.
+
+    :param prompt: Текст для перевода.
+    :param srcTrans: Исходный язык (по умолчанию "auto").
+    :param toTrans: Целевой язык (по умолчанию "en").
+    :return: Переведенный текст или пустая строка в случае ошибки.
+    """
     if not srcTrans:
-        srcTrans = "auto"
-
+        srcTrans = "auto"  # Автоматическое определение исходного языка
     if not toTrans:
-        toTrans = "en"
+        toTrans = "en"  # По умолчанию перевод на английский
 
-    translate_text_prompt = ""
-    if prompt and prompt.strip() != "":
-        translate_text_prompt = translator.translate(
-            prompt, src=srcTrans, dest=toTrans
-        )
+    # Проверка, что текст не пустой
+    if not prompt or prompt.strip() == "":
+        return ""
 
-    return translate_text_prompt.text if hasattr(translate_text_prompt, "text") else ""
+    try:
+        # Выполняем асинхронный перевод
+        translate_result = await translator.translate(prompt, src=srcTrans, dest=toTrans)
+        # Возвращаем переведенный текст
+        return translate_result.text if hasattr(translate_result, "text") else ""
+    except Exception as e:
+        # Обработка ошибок (например, проблемы с подключением к Google Translate)
+        print(f"Translation error: {e}")
+        return ""
+
+
+def run_async(coro):
+    """
+    Запускает асинхронную корутину в текущем или новом цикле событий.
+    """
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    if loop.is_running():
+        # Если цикл уже запущен, используем run_coroutine_threadsafe
+        future = asyncio.run_coroutine_threadsafe(coro, loop)
+        return future.result()
+    else:
+        # Если цикл не запущен, используем asyncio.run
+        return loop.run_until_complete(coro)
 
 
 class GoogleTranslateCLIPTextEncodeNode:
@@ -32,7 +66,6 @@ class GoogleTranslateCLIPTextEncodeNode:
                     {"default": "auto"},
                 ),
                 "to_translate": (list(LANGUAGES.keys()), {"default": "en"}),
-                "manual_translate": ("BOOLEAN", {"default": False}),
                 "text": ("STRING", {"multiline": True, "placeholder": "Input prompt"}),
                 "clip": ("CLIP",),
             }
@@ -49,18 +82,15 @@ class GoogleTranslateCLIPTextEncodeNode:
     def translate_text(self, **kwargs):
         from_translate = kwargs.get("from_translate")
         to_translate = kwargs.get("to_translate")
-        manual_translate = kwargs.get("manual_translate", False)
         text = kwargs.get("text")
         clip = kwargs.get("clip")
 
-        text_tranlsated = (
-            translate(text, from_translate, to_translate)
-            if not manual_translate
-            else text
-        )
-        tokens = clip.tokenize(text_tranlsated)
+        # Запускаем асинхронный перевод через run_async
+        text_translated = run_async(translate(text, from_translate, to_translate))
+
+        tokens = clip.tokenize(text_translated)
         cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
-        return ([[cond, {"pooled_output": pooled}]], text_tranlsated)
+        return ([[cond, {"pooled_output": pooled}]], text_translated)
 
 
 class GoogleTranslateTextNode(GoogleTranslateCLIPTextEncodeNode):
@@ -80,15 +110,11 @@ class GoogleTranslateTextNode(GoogleTranslateCLIPTextEncodeNode):
     def translate_text(self, **kwargs):
         from_translate = kwargs.get("from_translate")
         to_translate = kwargs.get("to_translate")
-        manual_translate = kwargs.get("manual_translate", False)
         text = kwargs.get("text")
 
-        text_tranlsated = (
-            translate(text, from_translate, to_translate)
-            if not manual_translate
-            else text
-        )
-        return (text_tranlsated,)
+        # Запускаем асинхронный перевод через run_async
+        text_translated = run_async(translate(text, from_translate, to_translate))
 
+        return (text_translated,)
 
 ### =====  GoogleTranslate Nodes [googletrans module] -> end ===== ###
