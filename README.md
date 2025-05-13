@@ -1,12 +1,30 @@
-#fork from 
+# fork from 
+Это fork репозитария Алексея
 https://github.com/AlekPet/ComfyUI_Custom_Nodes_AlekPet
 
-# ComfyUI Custom Nodes
+# fork from
 
+Это fork chflame163
+https://github.com/chflame163/ComfyUI_LayerStyle
 
-# List Nodes:
+Собственно сам репозиторий является компактной сборкой с небольшой модификацией кода.
 
-| Name                                  |                                                     Description                                                      |     ComfyUI category      |
-| :------------------------------------ | :------------------------------------------------------------------------------------------------------------------: | :-----------------------: |
-| _IDENode_                             |          The node that allows you to run code written in **Python** or **Javascript** directly in the node           | AlekPet Node/experiments  |
+## Переводчик Google
 
+Данные ноды только переводят с помощью Google translate.
+
+Никакого ключа создавать не требуется
+
+GoogleTranslateCLIPTextEncodeNode
+
+GoogleTranslateTextNode
+
+## Image resize
+
+Представлена ровно одна нода которая позволяет делать resize картинки и/или маски
+
+Маску можно не указывать - тогда будет обычный resize (или upscale)
+
+Для upscale желательно использовать другую ноду.
+
+ImageScaleByAspectRatioV2
