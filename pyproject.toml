@@ -1,7 +1,7 @@
 [project]
 name = "comfyui_custom_nodes_gayrat"
-description = "Nodes:GoogleTranslate."
-version = "1.0.0"
+description = "Nodes:GoogleTranslate, ImageResize"
+version = "1.0.1"
 license = { file = "LICENSE" }
 
 [project.urls]
