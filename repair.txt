@@ -1,5 +1,6 @@
 cd /workspace/ComfyUI/custom/ComfyUI_Custom_Nodes_Gayrat
 
+
 # ComfyUI_Custom_Nodes_Gayrat/__init__.py
 docker cp /mnt/f/_prg/python/ComfyUI_Custom_Nodes_Gayrat/__init__.py comfyui-union2:/workspace/ComfyUI/custom_nodes/ComfyUI_Custom_Nodes_Gayrat/
 
