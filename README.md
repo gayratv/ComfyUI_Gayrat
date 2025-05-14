@@ -28,3 +28,10 @@ GoogleTranslateTextNode
 Для upscale желательно использовать другую ноду.
 
 ImageScaleByAspectRatioV2
+
+## Слайдер Float
+
+Float slider
+
+Замена для 
+https://github.com/11dogzi/Comfyui-ergouzi-Nodes
