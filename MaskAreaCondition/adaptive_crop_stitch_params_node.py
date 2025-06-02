@@ -66,7 +66,7 @@ class AdaptiveCropStitchParamsV2:
         "mask_blend_pixels",
         "output_target_width",
         "output_target_height",
-        "output_padding",
+        "output_padding2",
         "output_resize_to_target_size",
         "upscale_algorithm",
         "downscale_algorithm",
