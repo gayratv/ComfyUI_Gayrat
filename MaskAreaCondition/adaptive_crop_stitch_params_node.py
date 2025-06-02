@@ -4,7 +4,7 @@ import torch
 INTERPOLATION_MODES = ["bicubic", "bilinear", "area", "nearest", "lanczos"]
 PRERESIZE_MODES = ["ensure minimum resolution", "ensure maximum resolution", "just resize"]
 MAX_RESOLUTION_DEFAULT = 16384  # A common default for max resolution in ComfyUI nodes
-PADDING_VALUES = [0, 8, 16, 32, 64, 128, 256, 512]
+PADDING_VALUES = ["0", "8", "16", "32", "64", "128", "256", "512"]
 
 class AdaptiveCropStitchParamsV2:
     """
@@ -26,7 +26,7 @@ class AdaptiveCropStitchParamsV2:
                 "target_height": ("INT", {"default": 1024, "min": 64, "max": MAX_RESOLUTION_DEFAULT, "step": 32}),
                 # Modified target_padding to use a dropdown list
                 # This ensures that target_padding (and thus output_padding) is one of these fixed values.
-                "target_padding": (PADDING_VALUES, {"default": 32}),
+                "target_padding": (PADDING_VALUES, {"default": "32"}),
                 "upscale_algo": (INTERPOLATION_MODES, {"default": "bicubic"}),
                 "downscale_algo": (INTERPOLATION_MODES, {"default": "bilinear"}),
                 "hipass_filter_strength": ("FLOAT", {"default": 0.10, "min": 0.0, "max": 1.0, "step": 0.01}),
@@ -40,7 +40,7 @@ class AdaptiveCropStitchParamsV2:
         "INT",  # mask_blend_pixels
         "INT",  # output_target_width
         "INT",  # output_target_height
-        "INT",  # output_padding  <- This will be an INT, one of the values selected from the input dropdown
+        "STRING",  # output_padding  <- This will be an INT, one of the values selected from the input dropdown
         "BOOLEAN",  # output_resize_to_target_size
         "STRING",  # upscale_algorithm
         "STRING",  # downscale_algorithm
