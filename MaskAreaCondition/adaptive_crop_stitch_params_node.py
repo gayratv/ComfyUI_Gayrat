@@ -1,9 +1,11 @@
 import torch
 
-class AdaptiveCropStitchParams_Simplified_WithPassthrough: # Изменено имя класса
+MODEL_TYPES = ["Flux", "SD 1.5"] # Список для выбора модели
+
+class AdaptiveParamsWithModelChoice: # Изменено имя класса
     """
-    A node to dynamically generate context_factor, expand_px, and blend_px
-    based on the mask area percentage relative to the image,
+    A node to dynamically generate context_factor, expand_px, blend_px,
+    and target_size based on mask area and selected model type,
     and pass through the original image and mask.
     """
 
@@ -13,6 +15,7 @@ class AdaptiveCropStitchParams_Simplified_WithPassthrough: # Изменено и
             "required": {
                 "image": ("IMAGE",),
                 "mask": ("MASK",),
+                "model_type": (MODEL_TYPES, {"default": MODEL_TYPES[0]}), # Новый входной параметр
             }
         }
 
@@ -22,34 +25,26 @@ class AdaptiveCropStitchParams_Simplified_WithPassthrough: # Изменено и
         "FLOAT",  # context_from_mask_extend_factor
         "INT",    # mask_expand_pixels
         "INT",    # mask_blend_pixels
+        "INT",    # target_size
     )
     RETURN_NAMES = (
-        "image_out", # Имя для выходного изображения
-        "mask_out",  # Имя для выходной маски
+        "image_out",
+        "mask_out",
         "context_from_mask_extend_factor",
         "mask_expand_pixels",
         "mask_blend_pixels",
+        "target_size_out", # Имя для нового выходного параметра
     )
 
     FUNCTION = "get_params"
-    CATEGORY = "Gayrat_Simplified" # Категорию можно изменить или оставить
+    CATEGORY = "Gayrat" # Категорию можно изменить
 
-    def get_params(self, image: torch.Tensor, mask: torch.Tensor):
+    def get_params(self, image: torch.Tensor, mask: torch.Tensor, model_type: str):
 
         # === Calculate mask area percentage ===
-        if image is None or mask is None: # Добавлена проверка на None для image и mask
-            # Если image или mask отсутствуют, возвращаем их как есть (None)
-            # и значения по умолчанию для вычисляемых параметров.
+        if image is None or mask is None:
             calculated_mask_area_percentage = 0.0
-            # Возвращаем None для image и mask, если они были None на входе,
-            # и дефолтные значения для остальных параметров, чтобы избежать ошибок ниже.
-            if image is None: # Явно передаем None, если image is None
-                 pass # image останется None
-            if mask is None: # Явно передаем None, если mask is None
-                 pass # mask останется None
         else:
-            # Get dimensions of the first image in the batch
-            # ComfyUI IMAGE tensor typically NHWC, H=shape[1], W=shape[2]
             if image.dim() == 4 and image.shape[3] in [1, 3, 4]:  # NHWC
                 img_height, img_width = image.shape[1], image.shape[2]
             elif image.dim() == 3:  # Assuming CHW
@@ -59,12 +54,7 @@ class AdaptiveCropStitchParams_Simplified_WithPassthrough: # Изменено и
                 img_height, img_width = image.shape[-2], image.shape[-1]
 
             img_area = img_height * img_width
-
-            # Get the first mask in the batch
-            # ComfyUI MASK tensor is typically (Batch, Height, Width)
-            first_mask = mask[0]  # Shape: (Height, Width)
-
-            # Sum of mask pixels (where mask > 0)
+            first_mask = mask[0]
             active_mask_pixels = torch.sum(first_mask > 0).item()
 
             if img_area == 0:
@@ -73,8 +63,6 @@ class AdaptiveCropStitchParams_Simplified_WithPassthrough: # Изменено и
                 calculated_mask_area_percentage = (active_mask_pixels / img_area) * 100.0
 
         # === Dynamic values based on the *calculated* mask_area_percentage ===
-        # Эти значения будут вычислены даже если image/mask is None,
-        # так как calculated_mask_area_percentage будет 0.0
         if calculated_mask_area_percentage < 10.0:  # Small mask
             context_factor_val = 2.0
             expand_px_val = 6
@@ -88,22 +76,32 @@ class AdaptiveCropStitchParams_Simplified_WithPassthrough: # Изменено и
             expand_px_val = 24
             blend_px_val = 48
 
-        # Передаем оригинальные image и mask на выход
+        # === Determine target_size based on model_type ===
+        if model_type == "Flux":
+            target_size_val = 1024
+        elif model_type == "SD 1.5":
+            target_size_val = 512
+        else:
+            # Fallback, хотя ComfyUI должен передавать одно из определенных значений
+            print(f"Warning: Unknown model_type '{model_type}'. Defaulting target_size to 512.")
+            target_size_val = 512
+
         return (
-            image, # Оригинальное изображение
-            mask,  # Оригинальная маска
+            image,
+            mask,
             context_factor_val,
             expand_px_val,
             blend_px_val,
+            target_size_val, # Добавляем новый параметр на выход
         )
 
 
 # Node class mappings
 NODE_CLASS_MAPPINGS = {
-    "AdaptiveCropStitchParams_Simplified_WithPassthrough": AdaptiveCropStitchParams_Simplified_WithPassthrough
+    "AdaptiveParamsWithModelChoice": AdaptiveParamsWithModelChoice
 }
 
 # A dictionary that contains the friendly/humanly readable titles for the nodes
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "AdaptiveCropStitchParams_Simplified_WithPassthrough": "Simplified Adaptive Params + Passthrough"
+    "AdaptiveParamsWithModelChoice": "Adaptive Params (Model Choice + Passthrough)"
 }
