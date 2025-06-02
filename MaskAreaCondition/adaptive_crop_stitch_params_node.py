@@ -40,7 +40,7 @@ class AdaptiveCropStitchParamsV2:
         "INT",  # mask_blend_pixels
         "INT",  # output_target_width
         "INT",  # output_target_height
-        "STRING",  # output_padding  <- This will be an INT, one of the values selected from the input dropdown
+        PADDING_VALUES,  # output_padding  <- This will be an INT, one of the values selected from the input dropdown
         "BOOLEAN",  # output_resize_to_target_size
         "STRING",  # upscale_algorithm
         "STRING",  # downscale_algorithm
