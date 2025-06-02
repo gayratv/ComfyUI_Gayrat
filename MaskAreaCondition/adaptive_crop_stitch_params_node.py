@@ -27,8 +27,8 @@ class AdaptiveCropStitchParamsV2:
                 # Modified target_padding to use a dropdown list
                 # This ensures that target_padding (and thus output_padding) is one of these fixed values.
                 "target_padding": (PADDING_VALUES, {"default": "32"}),
-                "upscale_algo": (INTERPOLATION_MODES, {"default": "bicubic"}),
-                "downscale_algo": (INTERPOLATION_MODES, {"default": "bilinear"}),
+                # "upscale_algo": (INTERPOLATION_MODES, {"default": "bicubic"}),
+                # "downscale_algo": (INTERPOLATION_MODES, {"default": "bilinear"}),
                 "hipass_filter_strength": ("FLOAT", {"default": 0.10, "min": 0.0, "max": 1.0, "step": 0.01}),
             }
         }
@@ -42,8 +42,8 @@ class AdaptiveCropStitchParamsV2:
         "INT",  # output_target_height
         PADDING_VALUES,  # output_padding  <- This will be an INT, one of the values selected from the input dropdown
         "BOOLEAN",  # output_resize_to_target_size
-        "STRING",  # upscale_algorithm
-        "STRING",  # downscale_algorithm
+        # "STRING",  # upscale_algorithm
+        # "STRING",  # downscale_algorithm
         "BOOLEAN",  # mask_fill_holes
         "BOOLEAN",  # mask_invert
         "FLOAT",  # mask_hipass_filter
@@ -182,8 +182,8 @@ class AdaptiveCropStitchParamsV2:
             output_target_h_val,
             output_pad_val, # This is an INT from the fixed list
             output_resize_to_target_size_val,
-            upscale_algorithm_val,
-            downscale_algorithm_val,
+            # upscale_algorithm_val,
+            # downscale_algorithm_val,
             mask_fill_holes_val,
             mask_invert_val,
             mask_hipass_filter_val,
