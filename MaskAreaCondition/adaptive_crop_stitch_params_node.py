@@ -30,6 +30,7 @@ class AdaptiveCropStitchParamsV2:
         }
 
     RETURN_TYPES = (
+        "IMAGE", "MASK",
         "FLOAT",  # calculated_mask_area_percentage
         "FLOAT",  # context_from_mask_extend_factor
         "INT",  # mask_expand_pixels
@@ -56,6 +57,7 @@ class AdaptiveCropStitchParamsV2:
         "FLOAT",  # extend_right_factor,
     )
     RETURN_NAMES = (
+        "image_out", "mask_out",
         "calculated_mask_area_percentage",
         "context_from_mask_extend_factor",
         "mask_expand_pixels",
@@ -168,6 +170,7 @@ class AdaptiveCropStitchParamsV2:
             blend_px_val = 48
 
         return (
+            image, mask,
             calculated_mask_area_percentage,  # New output
             context_factor_val,
             expand_px_val,
