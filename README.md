@@ -35,3 +35,13 @@ Float slider
 
 Замена для 
 https://github.com/11dogzi/Comfyui-ergouzi-Nodes
+
+
+## хеш последнего комита
+git ls-remote https://github.com/gayratv/ComfyUI_Gayrat HEAD
+
+
+## Вычисление процентного соотношения площади маски к общей площади изображения
+
+fork from https://github.com/a-und-b/ComfyUI_MaskAreaCondition
+
