@@ -15,6 +15,8 @@ class AdaptiveCropStitchParamsV2:
 
     @classmethod
     def INPUT_TYPES(s):
+        # Define the list of allowed padding values for the dropdown
+        padding_values = [0, 8, 16, 32, 64, 128, 256, 512]
         return {
             "required": {
                 "image": ("IMAGE",),
@@ -22,7 +24,9 @@ class AdaptiveCropStitchParamsV2:
                 # Allow user to override key "fixed" parameters based on my recommendations
                 "target_width": ("INT", {"default": 1024, "min": 64, "max": MAX_RESOLUTION_DEFAULT, "step": 32}),
                 "target_height": ("INT", {"default": 1024, "min": 64, "max": MAX_RESOLUTION_DEFAULT, "step": 32}),
-                "target_padding": ("INT", {"default": 32, "min": 0, "max": 256, "step": 1}),
+                # Modified target_padding to use a dropdown list
+                # This ensures that target_padding (and thus output_padding) is one of these fixed values.
+                "target_padding": (padding_values, {"default": 32}),
                 "upscale_algo": (INTERPOLATION_MODES, {"default": "bicubic"}),
                 "downscale_algo": (INTERPOLATION_MODES, {"default": "bilinear"}),
                 "hipass_filter_strength": ("FLOAT", {"default": 0.10, "min": 0.0, "max": 1.0, "step": 0.01}),
@@ -30,14 +34,13 @@ class AdaptiveCropStitchParamsV2:
         }
 
     RETURN_TYPES = (
-        "IMAGE", "MASK",
         "FLOAT",  # calculated_mask_area_percentage
         "FLOAT",  # context_from_mask_extend_factor
         "INT",  # mask_expand_pixels
         "INT",  # mask_blend_pixels
         "INT",  # output_target_width
         "INT",  # output_target_height
-        "INT",  # output_padding
+        "INT",  # output_padding  <- This will be an INT, one of the values selected from the input dropdown
         "BOOLEAN",  # output_resize_to_target_size
         "STRING",  # upscale_algorithm
         "STRING",  # downscale_algorithm
@@ -57,7 +60,6 @@ class AdaptiveCropStitchParamsV2:
         "FLOAT",  # extend_right_factor,
     )
     RETURN_NAMES = (
-        "image_out", "mask_out",
         "calculated_mask_area_percentage",
         "context_from_mask_extend_factor",
         "mask_expand_pixels",
@@ -88,7 +90,7 @@ class AdaptiveCropStitchParamsV2:
     CATEGORY = "Gayrat"  # Custom category for organization
 
     def get_params(self, image: torch.Tensor, mask: torch.Tensor,
-                   target_width, target_height, target_padding,
+                   target_width, target_height, target_padding, # target_padding will be an int from the list
                    upscale_algo, downscale_algo, hipass_filter_strength):
 
         # === Calculate mask area percentage ===
@@ -134,6 +136,8 @@ class AdaptiveCropStitchParamsV2:
         output_resize_to_target_size_val = True
         output_target_w_val = target_width
         output_target_h_val = target_height
+        # output_pad_val will be the integer value selected from the 'target_padding' dropdown.
+        # This ensures it's one of the fixed values [0, 8, 16, 32, 64, 128, 256, 512].
         output_pad_val = target_padding
         upscale_algorithm_val = upscale_algo
         downscale_algorithm_val = downscale_algo
@@ -170,14 +174,13 @@ class AdaptiveCropStitchParamsV2:
             blend_px_val = 48
 
         return (
-            image, mask,
             calculated_mask_area_percentage,  # New output
             context_factor_val,
             expand_px_val,
             blend_px_val,
             output_target_w_val,
             output_target_h_val,
-            output_pad_val,
+            output_pad_val, # This is an INT from the fixed list
             output_resize_to_target_size_val,
             upscale_algorithm_val,
             downscale_algorithm_val,
