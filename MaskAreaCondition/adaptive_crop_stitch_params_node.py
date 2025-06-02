@@ -83,7 +83,7 @@ class AdaptiveCropStitchParamsV2:
     )
 
     FUNCTION = "get_params"
-    CATEGORY = "Parameters/Inpaint"  # Custom category for organization
+    CATEGORY = "Gayrat"  # Custom category for organization
 
     def get_params(self, image: torch.Tensor, mask: torch.Tensor,
                    target_width, target_height, target_padding,

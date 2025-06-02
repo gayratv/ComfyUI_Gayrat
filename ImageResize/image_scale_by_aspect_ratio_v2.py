@@ -39,7 +39,7 @@ class ImageScaleByAspectRatioV2:
     RETURN_TYPES = ("IMAGE", "MASK", "BOX", "INT", "INT",)
     RETURN_NAMES = ("image", "mask", "original_size", "width", "height",)
     FUNCTION = 'image_scale_by_aspect_ratio'
-    CATEGORY = 'ImageResize'
+    CATEGORY = 'Gayrat'
 
     def image_scale_by_aspect_ratio(self, aspect_ratio, proportional_width, proportional_height,
                                     fit, method, round_to_multiple, scale_to_side, scale_to_length,
