@@ -33,6 +33,12 @@ class SaveImageWithAlpha:
         )
         results = list()
 
+        # Debug output
+        print(f"Image shape: {image.shape}")
+        print(f"Mask shape: {mask.shape}")
+        print(f"Number of images: {len(image)}")
+        print(f"Number of masks: {len(mask)}")
+
         # Ensure mask has same batch size as image
         if mask.shape[0] < image.shape[0]:
             mask = mask.repeat(image.shape[0], 1, 1)
