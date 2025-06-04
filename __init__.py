@@ -5,6 +5,7 @@ from .ImageResize.image_scale_by_aspect_ratio_v2 import ImageScaleByAspectRatioV
 from .ergouzi.EGJDFDHT import EGRYHT
 from .MaskAreaCondition.adaptive_crop_stitch_params_node import AdaptiveParamsWithModelChoice
 from .SaveImageAndMask.save_image_with_mask import SaveImageWithMask
+from .SaveImageAndMask.save_image_with_alpha import SaveImageWithAlpha
 
 # Список узлов, которые будут зарегистрированы в ComfyUI
 NODE_CLASS_MAPPINGS = {
@@ -13,7 +14,8 @@ NODE_CLASS_MAPPINGS = {
     "ImageResize: ImageScaleByAspectRatio V2": ImageScaleByAspectRatioV2,
     "EG_RY_HT" : EGRYHT,
     "AdaptiveParamsWithModelChoice": AdaptiveParamsWithModelChoice,
-    "SaveImageWithMask": SaveImageWithMask
+    "SaveImageWithMask": SaveImageWithMask,
+    "SaveImageWithAlpha": SaveImageWithAlpha
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -22,5 +24,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "ImageResize": "ImageScaleByAspectRatio V2",
     "EG_RY_HT": "Float slider",
     "AdaptiveParamsWithModelChoice": "Adaptive Params (Model Choice + Passthrough)",
-    "SaveImageWithMask": "Save Image with Mask"
+    "SaveImageWithMask": "Save Image with Mask",
+    "SaveImageWithAlpha": "Save Image with Alpha"
 }
