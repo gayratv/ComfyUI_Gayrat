@@ -36,70 +36,63 @@ class LoadImageWithTrimOptions:
             if i.mode == 'I':
                 i = i.point(lambda i: i * (1 / 255))
 
-            # Get full image
-            image_full = i.convert("RGB")
-            image_full_np = np.array(image_full).astype(np.float32) / 255.0
+            # Always convert to RGB for full image
+            image_rgb = i.convert("RGB")
+
+            # Get full image tensor
+            image_full_np = np.array(image_rgb).astype(np.float32) / 255.0
             image_full_tensor = torch.from_numpy(image_full_np)[None,]
 
             # Handle alpha channel and trimming
             if 'A' in i.getbands():
-                mask = i.getchannel('A')
-                mask_np = np.array(mask).astype(np.float32) / 255.0
+                # Get alpha channel
+                alpha = i.getchannel('A')
+                alpha_np = np.array(alpha).astype(np.float32) / 255.0
 
-                # Debug mask values
-                print(f"\n[LoadImageWithTrimOptions] Mask min value: {mask_np.min()}")
-                print(f"[LoadImageWithTrimOptions] Mask max value: {mask_np.max()}")
-                print(f"[LoadImageWithTrimOptions] Mask has transparency: {(mask_np < 1.0).any()}")
+                # Debug info
+                print(f"\n[LoadImageWithTrimOptions] Processing image with alpha channel")
+                print(f"[LoadImageWithTrimOptions] Alpha min: {alpha_np.min()}, max: {alpha_np.max()}")
 
-                # Check edges for transparency
-                top_edge = mask_np[0, :].min()
-                bottom_edge = mask_np[-1, :].min()
-                left_edge = mask_np[:, 0].min()
-                right_edge = mask_np[:, -1].min()
-                print(
-                    f"[LoadImageWithTrimOptions] Edge transparency - Top: {top_edge}, Bottom: {bottom_edge}, Left: {left_edge}, Right: {right_edge}")
+                # Find bounding box of non-transparent area
+                alpha_pil = Image.fromarray((alpha_np * 255).astype(np.uint8), mode='L')
+                bbox = alpha_pil.getbbox()
 
-                # Invert mask for ComfyUI (1 - mask)
-                mask_inverted = 1.0 - mask_np
-                mask_tensor = torch.from_numpy(mask_inverted)[None,]
+                if bbox and bbox != (0, 0, alpha_pil.width, alpha_pil.height):
+                    # Trim needed
+                    print(f"[LoadImageWithTrimOptions] Trimming to bbox: {bbox}")
 
-                # For trimming, use the original non-inverted mask
-                mask_pil = Image.fromarray((mask_np * 255).astype(np.uint8), mode='L')
-                bbox = mask_pil.getbbox()
-
-                if bbox and bbox != (0, 0, mask_pil.width, mask_pil.height):
-                    # Crop image and mask to bounding box
-                    print(f"\n[LoadImageWithTrimOptions] Trimming to bbox: {bbox}")
-                    image_trimmed = image_full.crop(bbox)
-                    mask_trimmed = mask.crop(bbox)
-
+                    # Crop RGB image
+                    image_trimmed = image_rgb.crop(bbox)
                     image_trimmed_np = np.array(image_trimmed).astype(np.float32) / 255.0
                     image_trimmed_tensor = torch.from_numpy(image_trimmed_np)[None,]
 
-                    # Process trimmed mask with inversion
-                    mask_trimmed_np = np.array(mask_trimmed).astype(np.float32) / 255.0
-                    mask_trimmed_inverted = 1.0 - mask_trimmed_np
-                    mask_trimmed_tensor = torch.from_numpy(mask_trimmed_inverted)[None,]
+                    # Crop alpha and invert for mask
+                    alpha_trimmed = alpha.crop(bbox)
+                    alpha_trimmed_np = np.array(alpha_trimmed).astype(np.float32) / 255.0
+                    mask_trimmed = 1.0 - alpha_trimmed_np  # Invert for ComfyUI
+                    mask_trimmed_tensor = torch.from_numpy(mask_trimmed)[None,]
                 else:
-                    # Empty mask or full image, use full image
-                    print(f"\n[LoadImageWithTrimOptions] No trimming needed, using full image")
+                    # No trim needed
+                    print(f"[LoadImageWithTrimOptions] No trimming needed")
                     image_trimmed_tensor = image_full_tensor
-                    mask_trimmed_tensor = mask_tensor
+                    mask_trimmed = 1.0 - alpha_np  # Invert for ComfyUI
+                    mask_trimmed_tensor = torch.from_numpy(mask_trimmed)[None,]
             else:
-                # No alpha channel - trimmed and full are the same
+                # No alpha channel
+                print(f"\n[LoadImageWithTrimOptions] No alpha channel found")
                 image_trimmed_tensor = image_full_tensor
-                # Create white mask (in ComfyUI format: 0 = opaque)
-                mask_tensor = torch.zeros((1, image_full_tensor.shape[1], image_full_tensor.shape[2]),
-                                          dtype=torch.float32)
-                mask_trimmed_tensor = mask_tensor
+                # Create opaque mask (zeros in ComfyUI format)
+                mask_trimmed_tensor = torch.zeros((1, image_full_tensor.shape[1], image_full_tensor.shape[2]),
+                                                  dtype=torch.float32)
+
+            # Debug output shapes
+            print(f"[LoadImageWithTrimOptions] Full image shape: {image_full_tensor.shape}")
+            print(f"[LoadImageWithTrimOptions] Trimmed image shape: {image_trimmed_tensor.shape}")
+            print(f"[LoadImageWithTrimOptions] Mask shape: {mask_trimmed_tensor.shape}\n")
 
             output_images.append(image_trimmed_tensor)
             output_images_full.append(image_full_tensor)
             output_masks.append(mask_trimmed_tensor)
-
-            print(f"\n[LoadImageWithTrimOptions] Full image shape: {image_full_tensor.shape}")
-            print(f"[LoadImageWithTrimOptions] Trimmed image shape: {image_trimmed_tensor.shape}")
-            print(f"[LoadImageWithTrimOptions] Mask shape: {mask_trimmed_tensor.shape}\n")
 
         if len(output_images) > 1:
             output_image = torch.cat(output_images, dim=0)
