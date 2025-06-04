@@ -45,7 +45,6 @@ class LoadImageWithTrimOptions:
             if 'A' in i.getbands():
                 mask = i.getchannel('A')
                 mask_np = np.array(mask).astype(np.float32) / 255.0
-                mask_tensor = torch.from_numpy(mask_np)[None,]
 
                 # Debug mask values
                 print(f"\n[LoadImageWithTrimOptions] Mask min value: {mask_np.min()}")
@@ -60,8 +59,11 @@ class LoadImageWithTrimOptions:
                 print(
                     f"[LoadImageWithTrimOptions] Edge transparency - Top: {top_edge}, Bottom: {bottom_edge}, Left: {left_edge}, Right: {right_edge}")
 
-                # Trim image by mask using same logic as ComfyUI's LoadImage
-                # Convert mask to 0-255 range for getbbox
+                # Invert mask for ComfyUI (1 - mask)
+                mask_inverted = 1.0 - mask_np
+                mask_tensor = torch.from_numpy(mask_inverted)[None,]
+
+                # For trimming, use the original non-inverted mask
                 mask_pil = Image.fromarray((mask_np * 255).astype(np.uint8), mode='L')
                 bbox = mask_pil.getbbox()
 
@@ -74,20 +76,21 @@ class LoadImageWithTrimOptions:
                     image_trimmed_np = np.array(image_trimmed).astype(np.float32) / 255.0
                     image_trimmed_tensor = torch.from_numpy(image_trimmed_np)[None,]
 
+                    # Process trimmed mask with inversion
                     mask_trimmed_np = np.array(mask_trimmed).astype(np.float32) / 255.0
-                    mask_trimmed_tensor = torch.from_numpy(mask_trimmed_np)[None,]
-
-                    print(f"\n[LoadImageWithTrimOptions] Bounding box found: {bbox}")
+                    mask_trimmed_inverted = 1.0 - mask_trimmed_np
+                    mask_trimmed_tensor = torch.from_numpy(mask_trimmed_inverted)[None,]
                 else:
-                    # Empty mask, use full image
-                    print(f"\n[LoadImageWithTrimOptions] No bounding box found, using full image")
+                    # Empty mask or full image, use full image
+                    print(f"\n[LoadImageWithTrimOptions] No trimming needed, using full image")
                     image_trimmed_tensor = image_full_tensor
                     mask_trimmed_tensor = mask_tensor
             else:
                 # No alpha channel - trimmed and full are the same
                 image_trimmed_tensor = image_full_tensor
-                mask_tensor = torch.ones((1, image_full_tensor.shape[1], image_full_tensor.shape[2]),
-                                         dtype=torch.float32)
+                # Create white mask (in ComfyUI format: 0 = opaque)
+                mask_tensor = torch.zeros((1, image_full_tensor.shape[1], image_full_tensor.shape[2]),
+                                          dtype=torch.float32)
                 mask_trimmed_tensor = mask_tensor
 
             output_images.append(image_trimmed_tensor)
