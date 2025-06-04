@@ -6,6 +6,7 @@ from .ergouzi.EGJDFDHT import EGRYHT
 from .MaskAreaCondition.adaptive_crop_stitch_params_node import AdaptiveParamsWithModelChoice
 from .SaveImageAndMask.save_image_with_mask import SaveImageWithMask
 from .SaveImageAndMask.save_image_with_alpha import SaveImageWithAlpha
+from .SaveImageAndMask.LoadImageWithTrimOptions import LoadImageWithTrimOptions
 
 # Список узлов, которые будут зарегистрированы в ComfyUI
 NODE_CLASS_MAPPINGS = {
@@ -15,7 +16,8 @@ NODE_CLASS_MAPPINGS = {
     "EG_RY_HT" : EGRYHT,
     "AdaptiveParamsWithModelChoice": AdaptiveParamsWithModelChoice,
     "SaveImageWithMask": SaveImageWithMask,
-    "SaveImageWithAlpha": SaveImageWithAlpha
+    "SaveImageWithAlpha": SaveImageWithAlpha,
+    "LoadImageWithTrimOptions": LoadImageWithTrimOptions
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -25,5 +27,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "EG_RY_HT": "Float slider",
     "AdaptiveParamsWithModelChoice": "Adaptive Params (Model Choice + Passthrough)",
     "SaveImageWithMask": "Save Image with Mask",
-    "SaveImageWithAlpha": "Save Image with Alpha"
+    "SaveImageWithAlpha": "Save Image with Alpha",
+    "LoadImageWithTrimOptions": "Load Image (Trim + Full)"
 }
