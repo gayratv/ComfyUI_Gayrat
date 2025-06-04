@@ -47,6 +47,11 @@ class LoadImageWithTrimOptions:
                 mask_np = np.array(mask).astype(np.float32) / 255.0
                 mask_tensor = torch.from_numpy(mask_np)[None,]
 
+                # Debug mask values
+                print(f"\n[LoadImageWithTrimOptions] Mask min value: {mask_np.min()}")
+                print(f"[LoadImageWithTrimOptions] Mask max value: {mask_np.max()}")
+                print(f"[LoadImageWithTrimOptions] Mask has transparency: {(mask_np < 1.0).any()}")
+
                 # Trim image by mask (same as standard LoadImage)
                 bbox = mask.getbbox()
                 if bbox:
@@ -59,8 +64,11 @@ class LoadImageWithTrimOptions:
 
                     mask_trimmed_np = np.array(mask_trimmed).astype(np.float32) / 255.0
                     mask_trimmed_tensor = torch.from_numpy(mask_trimmed_np)[None,]
+
+                    print(f"\n[LoadImageWithTrimOptions] Bounding box found: {bbox}")
                 else:
                     # Empty mask, use full image
+                    print(f"\n[LoadImageWithTrimOptions] No bounding box found, using full image")
                     image_trimmed_tensor = image_full_tensor
                     mask_trimmed_tensor = mask_tensor
             else:
