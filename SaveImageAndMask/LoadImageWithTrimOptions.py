@@ -131,7 +131,7 @@ class LoadImageWithTrimOptions:
 
         if len(output_images) > 1:
             output_image = torch.cat(output_images, dim=0)
-            output_image_full = torch.cat(output_images_full, dim=0)
+            # output_image_full = torch.cat(output_images_full, dim=0)
             output_mask = torch.cat(output_masks, dim=0)
         else:
             output_image = output_images[0]
