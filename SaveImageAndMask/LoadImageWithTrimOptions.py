@@ -52,10 +52,22 @@ class LoadImageWithTrimOptions:
                 print(f"[LoadImageWithTrimOptions] Mask max value: {mask_np.max()}")
                 print(f"[LoadImageWithTrimOptions] Mask has transparency: {(mask_np < 1.0).any()}")
 
-                # Trim image by mask (same as standard LoadImage)
-                bbox = mask.getbbox()
-                if bbox:
+                # Check edges for transparency
+                top_edge = mask_np[0, :].min()
+                bottom_edge = mask_np[-1, :].min()
+                left_edge = mask_np[:, 0].min()
+                right_edge = mask_np[:, -1].min()
+                print(
+                    f"[LoadImageWithTrimOptions] Edge transparency - Top: {top_edge}, Bottom: {bottom_edge}, Left: {left_edge}, Right: {right_edge}")
+
+                # Trim image by mask using same logic as ComfyUI's LoadImage
+                # Convert mask to 0-255 range for getbbox
+                mask_pil = Image.fromarray((mask_np * 255).astype(np.uint8), mode='L')
+                bbox = mask_pil.getbbox()
+
+                if bbox and bbox != (0, 0, mask_pil.width, mask_pil.height):
                     # Crop image and mask to bounding box
+                    print(f"\n[LoadImageWithTrimOptions] Trimming to bbox: {bbox}")
                     image_trimmed = image_full.crop(bbox)
                     mask_trimmed = mask.crop(bbox)
 
