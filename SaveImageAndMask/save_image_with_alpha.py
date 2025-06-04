@@ -34,10 +34,10 @@ class SaveImageWithAlpha:
         results = list()
 
         # Debug output
-        print(f"Image shape: {image.shape}")
-        print(f"Mask shape: {mask.shape}")
-        print(f"Number of images: {len(image)}")
-        print(f"Number of masks: {len(mask)}")
+        print(f"\n[SaveImageWithAlpha] Image shape: {image.shape}")
+        print(f"[SaveImageWithAlpha] Mask shape: {mask.shape}")
+        print(f"[SaveImageWithAlpha] Number of images: {len(image)}")
+        print(f"[SaveImageWithAlpha] Number of masks: {len(mask)}\n")
 
         # Ensure mask has same batch size as image
         if mask.shape[0] < image.shape[0]:
@@ -74,7 +74,14 @@ class SaveImageWithAlpha:
 
             # Save the image
             file = f"{filename}_{counter:05}_.png"
-            img_pil.save(os.path.join(full_output_folder, file), compress_level=4)
+            full_path = os.path.join(full_output_folder, file)
+            img_pil.save(full_path, compress_level=4)
+
+            # Debug: print saved image info
+            print(f"\n[SaveImageWithAlpha] Saved image: {file}")
+            print(f"[SaveImageWithAlpha] Saved image size: {img_pil.size}")
+            print(f"[SaveImageWithAlpha] Saved image mode: {img_pil.mode}\n")
+
             results.append({
                 "filename": file,
                 "subfolder": subfolder,

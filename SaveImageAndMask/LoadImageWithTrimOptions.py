@@ -74,9 +74,9 @@ class LoadImageWithTrimOptions:
             output_images_full.append(image_full_tensor)
             output_masks.append(mask_trimmed_tensor)
 
-            print(f"Full image shape: {image_full_tensor.shape}")
-            print(f"Trimmed image shape: {image_trimmed_tensor.shape}")
-            print(f"Mask shape: {mask_trimmed_tensor.shape}")
+            print(f"\n[LoadImageWithTrimOptions] Full image shape: {image_full_tensor.shape}")
+            print(f"[LoadImageWithTrimOptions] Trimmed image shape: {image_trimmed_tensor.shape}")
+            print(f"[LoadImageWithTrimOptions] Mask shape: {mask_trimmed_tensor.shape}\n")
 
         if len(output_images) > 1:
             output_image = torch.cat(output_images, dim=0)
