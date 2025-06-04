@@ -15,6 +15,10 @@ class LoadImageWithTrimOptions:
             "required": {
                 "image": (sorted(files), {"image_upload": True})
             },
+            "optional": {
+                "force_trim_test": ("BOOLEAN",
+                                    {"default": False, "label_on": "Force Trim (Test)", "label_off": "Normal"})
+            }
         }
 
     CATEGORY = "Gayrat"
@@ -23,7 +27,7 @@ class LoadImageWithTrimOptions:
     OUTPUT_NAMES = ("IMAGE", "IMAGE_FULL", "MASK",)
     FUNCTION = "load_image"
 
-    def load_image(self, image):
+    def load_image(self, image, force_trim_test=False):
         image_path = folder_paths.get_annotated_filepath(image)
         img = Image.open(image_path)
         output_images = []
@@ -53,30 +57,61 @@ class LoadImageWithTrimOptions:
                 print(f"\n[LoadImageWithTrimOptions] Processing image with alpha channel")
                 print(f"[LoadImageWithTrimOptions] Alpha min: {alpha_np.min()}, max: {alpha_np.max()}")
 
-                # Find bounding box of non-transparent area
-                alpha_pil = Image.fromarray((alpha_np * 255).astype(np.uint8), mode='L')
-                bbox = alpha_pil.getbbox()
+                # Create mask for ComfyUI (inverted)
+                mask_np = 1.0 - alpha_np
+                mask_tensor = torch.from_numpy(mask_np)[None,]
 
-                if bbox and bbox != (0, 0, alpha_pil.width, alpha_pil.height):
-                    # Trim needed
-                    print(f"[LoadImageWithTrimOptions] Trimming to bbox: {bbox}")
+                # For standard LoadImage compatibility, we need to trim EMPTY space
+                # In ComfyUI, LoadImage uses a different approach than simple getbbox
+                # It removes rows/columns that are completely transparent
 
-                    # Crop RGB image
-                    image_trimmed = image_rgb.crop(bbox)
-                    image_trimmed_np = np.array(image_trimmed).astype(np.float32) / 255.0
-                    image_trimmed_tensor = torch.from_numpy(image_trimmed_np)[None,]
+                # Find bounds of non-transparent content
+                # Check each row and column for any non-transparent pixel
+                rows_with_content = np.any(alpha_np > 0, axis=1)
+                cols_with_content = np.any(alpha_np > 0, axis=0)
 
-                    # Crop alpha and invert for mask
-                    alpha_trimmed = alpha.crop(bbox)
-                    alpha_trimmed_np = np.array(alpha_trimmed).astype(np.float32) / 255.0
-                    mask_trimmed = 1.0 - alpha_trimmed_np  # Invert for ComfyUI
-                    mask_trimmed_tensor = torch.from_numpy(mask_trimmed)[None,]
+                if np.any(rows_with_content) and np.any(cols_with_content):
+                    # Find first and last row/column with content
+                    top = np.argmax(rows_with_content)
+                    bottom = len(rows_with_content) - np.argmax(rows_with_content[::-1])
+                    left = np.argmax(cols_with_content)
+                    right = len(cols_with_content) - np.argmax(cols_with_content[::-1])
+
+                    bbox = (left, top, right, bottom)
+
+                    # For testing: force trim even if edges are not transparent
+                    if force_trim_test and bbox == (0, 0, alpha.width, alpha.height):
+                        # Trim 10% from each side for testing
+                        margin = 0.1
+                        left = int(alpha.width * margin)
+                        top = int(alpha.height * margin)
+                        right = int(alpha.width * (1 - margin))
+                        bottom = int(alpha.height * (1 - margin))
+                        bbox = (left, top, right, bottom)
+                        print(f"[LoadImageWithTrimOptions] FORCE TRIM TEST: trimming to {bbox}")
+
+                    if bbox != (0, 0, alpha.width, alpha.height):
+                        # Trim needed
+                        print(f"[LoadImageWithTrimOptions] Trimming to bbox: {bbox}")
+
+                        # Crop RGB image
+                        image_trimmed = image_rgb.crop(bbox)
+                        image_trimmed_np = np.array(image_trimmed).astype(np.float32) / 255.0
+                        image_trimmed_tensor = torch.from_numpy(image_trimmed_np)[None,]
+
+                        # Crop mask
+                        mask_trimmed = mask_np[top:bottom, left:right]
+                        mask_trimmed_tensor = torch.from_numpy(mask_trimmed)[None,]
+                    else:
+                        # No trim needed
+                        print(f"[LoadImageWithTrimOptions] No trimming needed")
+                        image_trimmed_tensor = image_full_tensor
+                        mask_trimmed_tensor = mask_tensor
                 else:
-                    # No trim needed
-                    print(f"[LoadImageWithTrimOptions] No trimming needed")
+                    # Completely transparent image
+                    print(f"[LoadImageWithTrimOptions] Completely transparent image")
                     image_trimmed_tensor = image_full_tensor
-                    mask_trimmed = 1.0 - alpha_np  # Invert for ComfyUI
-                    mask_trimmed_tensor = torch.from_numpy(mask_trimmed)[None,]
+                    mask_trimmed_tensor = mask_tensor
             else:
                 # No alpha channel
                 print(f"\n[LoadImageWithTrimOptions] No alpha channel found")
