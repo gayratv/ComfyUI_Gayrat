@@ -45,3 +45,5 @@ git ls-remote https://github.com/gayratv/ComfyUI_Gayrat HEAD
 
 fork from https://github.com/a-und-b/ComfyUI_MaskAreaCondition
 
+## добавлена нода SaveImageWithMask
+
