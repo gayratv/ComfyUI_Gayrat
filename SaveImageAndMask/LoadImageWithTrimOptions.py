@@ -18,8 +18,9 @@ class LoadImageWithTrimOptions:
         }
 
     CATEGORY = "Gayrat"
-    RETURN_TYPES = ("IMAGE", "IMAGE", "MASK")
-    OUTPUT_NAMES = ("IMAGE", "IMAGE_FULL", "MASK")
+    RETURN_TYPES = ("IMAGE", "IMAGE", "MASK",)
+    RETURN_NAMES = ("IMAGE", "IMAGE_FULL", "MASK",)
+    OUTPUT_NAMES = ("IMAGE", "IMAGE_FULL", "MASK",)
     FUNCTION = "load_image"
 
     def load_image(self, image):
