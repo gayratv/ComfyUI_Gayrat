@@ -4,7 +4,6 @@ from .GoogleTranslateNode.google_translate_node import GoogleTranslateCLIPTextEn
 from .ImageResize.image_scale_by_aspect_ratio_v2 import ImageScaleByAspectRatioV2
 from .ergouzi.EGJDFDHT import EGRYHT
 from .MaskAreaCondition.adaptive_crop_stitch_params_node import AdaptiveParamsWithModelChoice
-from .SaveImageAndMask.save_image_with_mask import SaveImageWithMask
 from .SaveImageAndMask.save_image_with_alpha import SaveImageWithAlpha
 from .SaveImageAndMask.LoadImageWithTrimOptions import LoadImageWithTrimOptions
 
@@ -15,7 +14,6 @@ NODE_CLASS_MAPPINGS = {
     "ImageResize: ImageScaleByAspectRatio V2": ImageScaleByAspectRatioV2,
     "EG_RY_HT" : EGRYHT,
     "AdaptiveParamsWithModelChoice": AdaptiveParamsWithModelChoice,
-    "SaveImageWithMask": SaveImageWithMask,
     "SaveImageWithAlpha": SaveImageWithAlpha,
     "LoadImageWithTrimOptions": LoadImageWithTrimOptions
 }
@@ -26,7 +24,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "ImageResize": "ImageScaleByAspectRatio V2",
     "EG_RY_HT": "Float slider",
     "AdaptiveParamsWithModelChoice": "Adaptive Params (Model Choice + Passthrough)",
-    "SaveImageWithMask": "Save Image with Mask",
     "SaveImageWithAlpha": "Save Image with Alpha",
     "LoadImageWithTrimOptions": "Load Image (Trim + Full)"
 }
