@@ -17,7 +17,7 @@ class LoadImageWithTrimOptions:
             },
         }
 
-    CATEGORY = "image"
+    CATEGORY = "Gayrat"
     RETURN_TYPES = ("IMAGE", "IMAGE", "MASK")
     OUTPUT_NAMES = ("IMAGE", "IMAGE_FULL", "MASK")
     FUNCTION = "load_image"

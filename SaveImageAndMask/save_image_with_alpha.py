@@ -24,7 +24,7 @@ class SaveImageWithAlpha:
     RETURN_TYPES = ()
     FUNCTION = "save_images"
     OUTPUT_NODE = True
-    CATEGORY = "image"
+    CATEGORY = "Gayrat"
 
     def save_images(self, image, mask, filename_prefix="ComfyUI"):
         filename_prefix += self.prefix_append
