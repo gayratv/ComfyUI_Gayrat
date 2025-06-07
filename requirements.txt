@@ -4,3 +4,4 @@ aiohttp
 torch
 Pillow
 numpy
+torchvision

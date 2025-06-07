@@ -13,6 +13,9 @@ from comfy_extras.nodes_model_advanced import ModelSamplingFlux, ModelSamplingAu
 from nodes import LoraLoader
 from comfy.utils import ProgressBar
 
+import torchvision.transforms.v2 as T
+import torch.nn.functional as F
+
 
 # путь к папке проекта (родитель папки Samplers)
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
