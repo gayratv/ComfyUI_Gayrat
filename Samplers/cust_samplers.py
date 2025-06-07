@@ -307,7 +307,7 @@ class PlotParameters:
 
     RETURN_TYPES = ("IMAGE", )
     FUNCTION = "execute"
-    CATEGORY = "essentials_mb/sampling"
+    CATEGORY = "Gayrat/sampling"
 
     def execute(self, images, params, order_by, cols_value, cols_num, add_prompt, add_params):
         from PIL import Image, ImageDraw, ImageFont
