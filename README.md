@@ -47,3 +47,5 @@ fork from https://github.com/a-und-b/ComfyUI_MaskAreaCondition
 
 ## добавлена нода SaveImageWithMask
 
+fork from
+https://github.com/MinorBoy/ComfyUI_essentials_mb

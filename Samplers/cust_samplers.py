@@ -7,9 +7,64 @@ import comfy.samplers
 from comfy_extras.nodes_custom_sampler import Noise_RandomNoise, BasicGuider, SamplerCustomAdvanced
 from comfy_extras.nodes_latent import LatentBatch
 from comfy_extras.nodes_model_advanced import ModelSamplingFlux, ModelSamplingAuraFlow
-from node_helpers import conditioning_set_values, parse_string_to_list
+# from node_helpers import conditioning_set_values, parse_string_to_list
 from nodes import LoraLoader
 from comfy.utils import ProgressBar
+
+def conditioning_set_values(conditioning, values={}, append=False):
+    c = []
+    for t in conditioning:
+        n = [t[0], t[1].copy()]
+        for k in values:
+            val = values[k]
+            if append:
+                old_val = n[1].get(k, None)
+                if old_val is not None:
+                    val = old_val + val
+
+            n[1][k] = val
+        c.append(n)
+
+    return c
+
+def parse_string_to_list(s):
+    elements = s.split(',')
+    result = []
+
+    def parse_number(s):
+        try:
+            if '.' in s:
+                return float(s)
+            else:
+                return int(s)
+        except ValueError:
+            return 0
+
+    def decimal_places(s):
+        if '.' in s:
+            return len(s.split('.')[1])
+        return 0
+
+    for element in elements:
+        element = element.strip()
+        if '...' in element:
+            start, rest = element.split('...')
+            end, step = rest.split('+')
+            decimals = decimal_places(step)
+            start = parse_number(start)
+            end = parse_number(end)
+            step = parse_number(step)
+            current = start
+            if (start > end and step > 0) or (start < end and step < 0):
+                step = -step
+            while current <= end:
+                result.append(round(current, decimals))
+                current += step
+        else:
+            result.append(round(parse_number(element), decimal_places(element)))
+
+    return result
+
 
 # Sampler selection helper
 class SamplerSelectHelper:
