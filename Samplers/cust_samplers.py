@@ -292,11 +292,179 @@ class FluxSamplerParams:
 
         return (out_latent, out_params, out_sigmas)
 
+class PlotParameters:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+                    "images": ("IMAGE", ),
+                    "params": ("SAMPLER_PARAMS", ),
+                    "order_by": (["none", "time", "seed", "steps", "denoise", "sampler", "scheduler", "guidance", "max_shift", "base_shift", "lora_strength"], ),
+                    "cols_value": (["none", "time", "seed", "steps", "denoise", "sampler", "scheduler", "guidance", "max_shift", "base_shift", "lora_strength"], ),
+                    "cols_num": ("INT", {"default": -1, "min": -1, "max": 1024 }),
+                    "add_prompt": (["false", "true", "excerpt"], ),
+                    "add_params": (["false", "true", "changes only"], {"default": "true"}),
+                }}
+
+    RETURN_TYPES = ("IMAGE", )
+    FUNCTION = "execute"
+    CATEGORY = "essentials_mb/sampling"
+
+    def execute(self, images, params, order_by, cols_value, cols_num, add_prompt, add_params):
+        from PIL import Image, ImageDraw, ImageFont
+        import math
+        import textwrap
+
+        if images.shape[0] != len(params):
+            raise ValueError("Number of images and number of parameters do not match.")
+
+        _params = params.copy()
+
+        if order_by != "none":
+            sorted_params = sorted(_params, key=lambda x: x[order_by])
+            indices = [_params.index(item) for item in sorted_params]
+            images = images[torch.tensor(indices)]
+            _params = sorted_params
+
+        if cols_value != "none" and cols_num > -1:
+            groups = {}
+            for p in _params:
+                value = p[cols_value]
+                if value not in groups:
+                    groups[value] = []
+                groups[value].append(p)
+            cols_num = len(groups)
+
+            sorted_params = []
+            groups = list(groups.values())
+            for g in zip(*groups):
+                sorted_params.extend(g)
+
+            indices = [_params.index(item) for item in sorted_params]
+            images = images[torch.tensor(indices)]
+            _params = sorted_params
+        elif cols_num == 0:
+            cols_num = int(math.sqrt(images.shape[0]))
+            cols_num = max(1, min(cols_num, 1024))
+
+        width = images.shape[2]
+        out_image = []
+
+        font = ImageFont.truetype(os.path.join(FONTS_DIR, 'ShareTechMono-Regular.ttf'), min(48, int(32*(width/1024))))
+        text_padding = 3
+        line_height = font.getmask('Q').getbbox()[3] + font.getmetrics()[1] + text_padding*2
+        char_width = font.getbbox('M')[2]+1 # using monospace font
+
+        if add_params == "changes only":
+            value_tracker = {}
+            for p in _params:
+                for key, value in p.items():
+                    if key != "time":
+                        if key not in value_tracker:
+                            value_tracker[key] = set()
+                        value_tracker[key].add(value)
+            changing_keys = {key for key, values in value_tracker.items() if len(values) > 1 or key == "prompt"}
+
+            result = []
+            for p in _params:
+                changing_params = {key: value for key, value in p.items() if key in changing_keys}
+                result.append(changing_params)
+
+            _params = result
+
+        for (image, param) in zip(images, _params):
+            image = image.permute(2, 0, 1)
+
+            if add_params != "false":
+                if add_params == "changes only":
+                    text = "\n".join([f"{key}: {value}" for key, value in param.items() if key != "prompt"])
+                else:
+                    text = f"time: {param['time']:.2f}s, seed: {param['seed']}, steps: {param['steps']}, size: {param['width']}×{param['height']}\ndenoise: {param['denoise']}, sampler: {param['sampler']}, sched: {param['scheduler']}\nguidance: {param['guidance']}, max/base shift: {param['max_shift']}/{param['base_shift']}"
+                    if 'lora' in param and param['lora']:
+                        text += f"\nLoRA: {param['lora'][:32]}, str: {param['lora_strength']}"
+
+                lines = text.split("\n")
+                text_height = line_height * len(lines)
+                text_image = Image.new('RGB', (width, text_height), color=(0, 0, 0))
+
+                for i, line in enumerate(lines):
+                    draw = ImageDraw.Draw(text_image)
+                    draw.text((text_padding, i * line_height + text_padding), line, font=font, fill=(255, 255, 255))
+
+                text_image = T.ToTensor()(text_image).to(image.device)
+                image = torch.cat([image, text_image], 1)
+
+            if 'prompt' in param and param['prompt'] and add_prompt != "false":
+                prompt = param['prompt']
+                if add_prompt == "excerpt":
+                    prompt = " ".join(param['prompt'].split()[:64])
+                    prompt += "..."
+
+                cols = math.ceil(width / char_width)
+                prompt_lines = textwrap.wrap(prompt, width=cols)
+                prompt_height = line_height * len(prompt_lines)
+                prompt_image = Image.new('RGB', (width, prompt_height), color=(0, 0, 0))
+
+                for i, line in enumerate(prompt_lines):
+                    draw = ImageDraw.Draw(prompt_image)
+                    draw.text((text_padding, i * line_height + text_padding), line, font=font, fill=(255, 255, 255))
+
+                prompt_image = T.ToTensor()(prompt_image).to(image.device)
+                image = torch.cat([image, prompt_image], 1)
+
+            # a little cleanup
+            image = torch.nan_to_num(image, nan=0.0).clamp(0.0, 1.0)
+            out_image.append(image)
+
+        # ensure all images have the same height
+        if add_prompt != "false" or add_params == "changes only":
+            max_height = max([image.shape[1] for image in out_image])
+            out_image = [F.pad(image, (0, 0, 0, max_height - image.shape[1])) for image in out_image]
+
+        out_image = torch.stack(out_image, 0).permute(0, 2, 3, 1)
+
+        # merge images
+        if cols_num > -1:
+            cols = min(cols_num, out_image.shape[0])
+            b, h, w, c = out_image.shape
+            rows = math.ceil(b / cols)
+
+            # Pad the tensor if necessary
+            if b % cols != 0:
+                padding = cols - (b % cols)
+                out_image = F.pad(out_image, (0, 0, 0, 0, 0, 0, 0, padding))
+                b = out_image.shape[0]
+
+            # Reshape and transpose
+            out_image = out_image.reshape(rows, cols, h, w, c)
+            out_image = out_image.permute(0, 2, 1, 3, 4)
+            out_image = out_image.reshape(rows * h, cols * w, c).unsqueeze(0)
+
+            """
+            width = out_image.shape[2]
+            # add the title and notes on top
+            if title and export_labels:
+                title_font = ImageFont.truetype(os.path.join(FONTS_DIR, 'ShareTechMono-Regular.ttf'), 48)
+                title_width = title_font.getbbox(title)[2]
+                title_padding = 6
+                title_line_height = title_font.getmask(title).getbbox()[3] + title_font.getmetrics()[1] + title_padding*2
+                title_text_height = title_line_height
+                title_text_image = Image.new('RGB', (width, title_text_height), color=(0, 0, 0, 0))
+
+                draw = ImageDraw.Draw(title_text_image)
+                draw.text((width//2 - title_width//2, title_padding), title, font=title_font, fill=(255, 255, 255))
+
+                title_text_image = T.ToTensor()(title_text_image).unsqueeze(0).permute([0,2,3,1]).to(out_image.device)
+                out_image = torch.cat([title_text_image, out_image], 1)
+            """
+
+        return (out_image, )
+
 # Register node classes
 NODE_CLASS_MAPPINGS = {
     "SamplerSelectHelper": SamplerSelectHelper,
     "SchedulerSelectHelper": SchedulerSelectHelper,
     "FluxSamplerParams": FluxSamplerParams,
+    "PlotParameters+": PlotParameters
 }
 
 # Display names for UI
@@ -304,4 +472,5 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "SamplerSelectHelper": "Sampler Select Helper",
     "SchedulerSelectHelper": "Scheduler Select Helper",
     "FluxSamplerParams": "Flux Sampler Params",
+    "PlotParameters+": "🔧 Plot Sampler Parameters"
 }
