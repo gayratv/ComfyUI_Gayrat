@@ -20,7 +20,7 @@ class SamplerSelectHelper:
         }}
     RETURN_TYPES = ("STRING",)
     FUNCTION = "execute"
-    CATEGORY = "essentials_mb/sampling"
+    CATEGORY = "Gayrat/sampling"
 
     def execute(self, **values):
         selected = [name for name, val in values.items() if val]
@@ -35,7 +35,7 @@ class SchedulerSelectHelper:
         }}
     RETURN_TYPES = ("STRING",)
     FUNCTION = "execute"
-    CATEGORY = "essentials_mb/sampling"
+    CATEGORY = "Gayrat/sampling"
 
     def execute(self, **values):
         selected = [name for name, val in values.items() if val]
@@ -97,7 +97,7 @@ class FluxSamplerParams:
     RETURN_TYPES = ("LATENT", "SAMPLER_PARAMS", "SIGMAS")
     RETURN_NAMES = ("latent", "params", "sigmas")
     FUNCTION = "execute"
-    CATEGORY = "essentials_mb/sampling"
+    CATEGORY = "Gayrat/sampling"
 
     def execute(self, model, conditioning, latent_image, seed, sampler, scheduler, steps, guidance, max_shift, base_shift, denoise, loras=None):
         is_schnell = model.model.model_type == comfy.model_base.ModelType.FLOW
