@@ -13,8 +13,10 @@ from comfy_extras.nodes_model_advanced import ModelSamplingFlux, ModelSamplingAu
 from nodes import LoraLoader
 from comfy.utils import ProgressBar
 
-import torchvision.transforms.v2 as T
 import torch.nn.functional as F
+# import torchvision.transforms.v2 as T
+import torchvision
+T = torchvision.transforms.v2
 
 
 # путь к папке проекта (родитель папки Samplers)
@@ -401,7 +403,8 @@ class PlotParameters:
                     draw = ImageDraw.Draw(text_image)
                     draw.text((text_padding, i * line_height + text_padding), line, font=font, fill=(255, 255, 255))
 
-                text_image = T.ToTensor()(text_image).to(image.device)
+                # text_image = T.ToTensor()(text_image).to(image.device)
+                text_image = T.Compose([T.ToImage(), T.ToDtype(torch.float32, scale=True)])(text_image).to(image.device)
                 image = torch.cat([image, text_image], 1)
 
             if 'prompt' in param and param['prompt'] and add_prompt != "false":
@@ -419,7 +422,8 @@ class PlotParameters:
                     draw = ImageDraw.Draw(prompt_image)
                     draw.text((text_padding, i * line_height + text_padding), line, font=font, fill=(255, 255, 255))
 
-                prompt_image = T.ToTensor()(prompt_image).to(image.device)
+                # prompt_image = T.ToTensor()(prompt_image).to(image.device)
+                prompt_image = T.Compose([T.ToImage(), T.ToDtype(torch.float32, scale=True)])(prompt_image).to(image.device)
                 image = torch.cat([image, prompt_image], 1)
 
             # a little cleanup
@@ -449,24 +453,6 @@ class PlotParameters:
             out_image = out_image.reshape(rows, cols, h, w, c)
             out_image = out_image.permute(0, 2, 1, 3, 4)
             out_image = out_image.reshape(rows * h, cols * w, c).unsqueeze(0)
-
-            """
-            width = out_image.shape[2]
-            # add the title and notes on top
-            if title and export_labels:
-                title_font = ImageFont.truetype(os.path.join(FONTS_DIR, 'ShareTechMono-Regular.ttf'), 48)
-                title_width = title_font.getbbox(title)[2]
-                title_padding = 6
-                title_line_height = title_font.getmask(title).getbbox()[3] + title_font.getmetrics()[1] + title_padding*2
-                title_text_height = title_line_height
-                title_text_image = Image.new('RGB', (width, title_text_height), color=(0, 0, 0, 0))
-
-                draw = ImageDraw.Draw(title_text_image)
-                draw.text((width//2 - title_width//2, title_padding), title, font=title_font, fill=(255, 255, 255))
-
-                title_text_image = T.ToTensor()(title_text_image).unsqueeze(0).permute([0,2,3,1]).to(out_image.device)
-                out_image = torch.cat([title_text_image, out_image], 1)
-            """
 
         return (out_image, )
 

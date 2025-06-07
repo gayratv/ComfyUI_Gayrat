@@ -1,0 +1,15 @@
+!!! Exception during processing !!! name 'T' is not defined
+Traceback (most recent call last):
+  File "/workspace/ComfyUI/execution.py", line 349, in execute
+    output_data, output_ui, has_subgraph = get_output_data(obj, input_data_all, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb)                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  File "/workspace/ComfyUI/execution.py", line 224, in get_output_data
+    return_values = _map_node_over_list(obj, input_data_all, obj.FUNCTION, allow_interrupt=True, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/ComfyUI/execution.py", line 196, in _map_node_over_list
+    process_inputs(input_dict, i)
+  File "/workspace/ComfyUI/execution.py", line 185, in process_inputs
+    results.append(getattr(obj, func)(**inputs))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/ComfyUI/custom_nodes/ComfyUI_Gayrat/Samplers/cust_samplers.py", line 401, in execute
+    text_image = T.ToTensor()(text_image).to(image.device)
+                 ^
+NameError: name 'T' is not defined

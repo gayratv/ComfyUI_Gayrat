@@ -1,0 +1,30 @@
+[
+  {
+    'time': 65.5216372013092,
+    'seed': 586,
+    'width': 1152,
+    'height': 896,
+    'sampler': 'ipndm',
+    'scheduler': 'simple',
+    'steps': 5,
+    'guidance': 2,
+    'max_shift': 1.15,
+    'base_shift': 0.5,
+    'denoise': 1.0,
+    'prompt': None
+  },
+  {
+    'time': 9.237099647521973,
+    'seed': 586,
+    'width': 1152,
+    'height': 896,
+    'sampler': 'ipndm',
+    'scheduler': 'simple',
+    'steps': 5,
+    'guidance': 3.5,
+    'max_shift': 1.15,
+    'base_shift': 0.5,
+    'denoise': 1.0,
+    'prompt': None
+  }
+]
