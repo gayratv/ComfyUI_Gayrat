@@ -3,6 +3,8 @@ import random
 import time
 import logging
 import torch
+import os
+
 import comfy.samplers
 from comfy_extras.nodes_custom_sampler import Noise_RandomNoise, BasicGuider, SamplerCustomAdvanced
 from comfy_extras.nodes_latent import LatentBatch
@@ -10,6 +12,12 @@ from comfy_extras.nodes_model_advanced import ModelSamplingFlux, ModelSamplingAu
 # from node_helpers import conditioning_set_values, parse_string_to_list
 from nodes import LoraLoader
 from comfy.utils import ProgressBar
+
+
+# путь к папке проекта (родитель папки Samplers)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+# теперь fonts в корне проекта
+FONTS_DIR = os.path.join(PROJECT_ROOT, "fonts")
 
 def conditioning_set_values(conditioning, values={}, append=False):
     c = []
