@@ -15,6 +15,7 @@ import torch
 import comfy.model_base
 import comfy.samplers
 
+from comfy_extras.nodes_optimalsteps import OptimalStepsScheduler
 from comfy_extras.nodes_custom_sampler import Noise_RandomNoise, BasicGuider, SamplerCustomAdvanced
 from comfy_extras.nodes_latent import LatentBatch
 from comfy_extras.nodes_model_advanced import ModelSamplingFlux, ModelSamplingAuraFlow
@@ -126,8 +127,11 @@ class SamplerSelectHelper:
 class SchedulerSelectHelper:
     @classmethod
     def INPUT_TYPES(cls):
+        # Добавляем "OptimalStepsScheduler" в SCHEDULERS
+        schedulers = list(comfy.samplers.KSampler.SCHEDULERS) + ["OptimalStepsScheduler"]
+
         return {"required": {
-            **{s: ("BOOLEAN", {"default": False}) for s in comfy.samplers.KSampler.SCHEDULERS},
+            **{s: ("BOOLEAN", {"default": False}) for s in schedulers},
         }}
     RETURN_TYPES = ("STRING",)
     FUNCTION = "execute"
@@ -142,6 +146,8 @@ class SchedulerSelectHelper:
         # Always include OptimalStepsScheduler
         if "OptimalStepsScheduler" not in selected:
             selected.append("OptimalStepsScheduler")
+
+
         return (", ".join(selected),)
 
 # Flux sampler parameters with internal scheduler helper
@@ -157,6 +163,8 @@ class FluxSamplerParams:
         """
         Возвращает torch.FloatTensor длиной steps+1
         """
+
+
         total_steps = steps
         if denoise < 1.0:
             if denoise <= 0.0:
@@ -164,7 +172,7 @@ class FluxSamplerParams:
             total_steps = int(steps / denoise)
 
         sched_l = scheduler.lower()
-        if sched_l in {"optimal", "optimal_steps", "optimalsteps"}:
+        if sched_l in {"optimal", "optimal_steps", "optimalsteps","optimalstepsscheduler"}:
             sig_out = OptimalStepsScheduler().get_sigmas("FLUX", total_steps, denoise)
             sigmas = sig_out[0] if isinstance(sig_out, (tuple, list)) else sig_out
             sigmas = sigmas.cpu()
@@ -224,6 +232,7 @@ class FluxSamplerParams:
         loras=None,
     ):
         is_flow = model.model.model_type == comfy.model_base.ModelType.FLOW
+        is_schnell = model.model.model_type == comfy.model_base.ModelType.FLOW
 
         # сиды
         noise_seeds = [
@@ -253,8 +262,14 @@ class FluxSamplerParams:
         guidance_list  = parse_string_to_list(guidance  or "3.5")
         max_shift_list = parse_string_to_list(max_shift or ("0"  if is_flow else "1.15"))
 
-        print("\n base_shift:", base_shift)
-        base_shift_list= parse_string_to_list(base_shift  ("1.0" if is_flow else "0.5"))
+        # if not is_schnell:
+        #     max_shift = "1.15" if max_shift == "" else max_shift
+        #     base_shift = "0.5" if base_shift == "" else base_shift
+        # else:
+        #     max_shift = "0"
+        #     base_shift = "1.0" if base_shift == "" else base_shift
+
+        base_shift_list = parse_string_to_list(base_shift)
 
         # conditioning
         if isinstance(conditioning, dict) and "encoded" in conditioning:
