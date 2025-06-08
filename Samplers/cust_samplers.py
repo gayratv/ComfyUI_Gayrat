@@ -141,70 +141,39 @@ class SchedulerSelectHelper:
 # ──────────────────────────────────────────────────────────────────────────────
 class FluxSamplerParams:
     """
-    Узел-помощник для перебора сэмплеров/планировщиков/сидов и т. д.
+    Перебор семплеров/планировщиков/сидов и пр. для генерации латент-изображений
     """
 
-    # ────────────────── внутренний хелпер для сигм ────────────────────────────
-    class _BasicScheduler:
+    # ── статический расчёт сигм ──────────────────────────────────────────────
+    @staticmethod
+    def _get_sigmas(model, scheduler: str, steps: int, denoise: float):
         """
-        Internal helper for computing sigma schedules.
-        Not registered as a separate node.
+        Возвращает torch.FloatTensor длиной steps+1
         """
+        total_steps = steps
+        if denoise < 1.0:
+            if denoise <= 0.0:
+                return torch.FloatTensor([])
+            total_steps = int(steps / denoise)
 
-        @classmethod
-        def INPUT_TYPES(cls):
-            return {
-                "required": {
-                    "model": ("MODEL",),
-                    "scheduler": (comfy.samplers.SCHEDULER_NAMES,),
-                    "steps": ("INT", {"default": 20, "min": 1, "max": 10_000}),
-                    "denoise": ("FLOAT", {"default": 1.0, "min": 0.0,
-                                          "max": 1.0, "step": 0.01}),
-                }
-            }
+        sched_l = scheduler.lower()
+        if sched_l in {"optimal", "optimal_steps", "optimalsteps"}:
+            sig_out = OptimalStepsScheduler().get_sigmas("FLUX", total_steps, denoise)
+            sigmas = sig_out[0] if isinstance(sig_out, (tuple, list)) else sig_out
+            sigmas = sigmas.cpu()
+        else:
+            sigmas = comfy.samplers.calculate_sigmas(
+                model.get_model_object("model_sampling"), scheduler, total_steps
+            ).cpu()
 
-        RETURN_TYPES = ("SIGMAS",)
-        FUNCTION = "get_sigmas"
+        return sigmas[-(steps + 1):]
 
-        # ── главный метод ─────────────────────────────────────────────────────
-        def get_sigmas(self, model, scheduler: str, steps: int, denoise: float):
-            """
-            Возвращает последовательность σ-значений длиной steps+1
-            """
-
-            total_steps = steps
-            if denoise < 1.0:
-                if denoise <= 0.0:
-                    return (torch.FloatTensor([]),)
-                total_steps = int(steps / denoise)
-
-            # ── кастомная ветка для OptimalStepsScheduler ─────────────────────
-            if scheduler.lower() in {"optimal", "optimal_steps", "optimalsteps"}:
-                # здесь модель не нужна, нужен только строковый тип
-                model_type = "FLUX"
-                sigmas = OptimalStepsScheduler().get_sigmas(
-                    model_type, total_steps, denoise
-                )[0].cpu()
-
-            # ── стандартная ветка ────────────────────────────────────────────
-            else:
-                sigmas = comfy.samplers.calculate_sigmas(
-                    model.get_model_object("model_sampling"),
-                    scheduler,
-                    total_steps,
-                ).cpu()
-
-            # оставляем ровно steps + 1 значений
-            sigmas = sigmas[-(steps + 1):]
-            return (sigmas,)
-
-    # ────────────────── инициализация узла ────────────────────────────────────
+    # ── инициализация ────────────────────────────────────────────────────────
     def __init__(self):
         self.loraloader = None
-        self._scheduler = self._BasicScheduler()
         self.lora = (None, None)
 
-    # ────────────────── описание входов ───────────────────────────────────────
+    # ── описание входов ───────────────────────────────────────────────────────
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -212,22 +181,14 @@ class FluxSamplerParams:
                 "model": ("MODEL",),
                 "conditioning": ("CONDITIONING",),
                 "latent_image": ("LATENT",),
-                "seed": ("STRING", {"multiline": False, "dynamicPrompts": False,
-                                    "default": "?"}),
-                "sampler": ("STRING", {"multiline": False, "dynamicPrompts": False,
-                                       "default": "euler"}),
-                "scheduler": ("STRING", {"multiline": False, "dynamicPrompts": False,
-                                         "default": "simple"}),
-                "steps": ("STRING", {"multiline": False, "dynamicPrompts": False,
-                                     "default": "20"}),
-                "guidance": ("STRING", {"multiline": False, "dynamicPrompts": False,
-                                        "default": "3.5"}),
-                "max_shift": ("STRING", {"multiline": False, "dynamicPrompts": False,
-                                         "default": ""}),
-                "base_shift": ("STRING", {"multiline": False, "dynamicPrompts": False,
-                                          "default": ""}),
-                "denoise": ("STRING", {"multiline": False, "dynamicPrompts": False,
-                                       "default": "1.0"}),
+                "seed": ("STRING", {"default": "?"}),
+                "sampler": ("STRING", {"default": "euler"}),
+                "scheduler": ("STRING", {"default": "simple"}),
+                "steps": ("STRING", {"default": "20"}),
+                "guidance": ("STRING", {"default": "3.5"}),
+                "max_shift": ("STRING", {"default": ""}),
+                "base_shift": ("STRING", {"default": ""}),
+                "denoise": ("STRING", {"default": "1.0"}),
             },
             "optional": {
                 "loras": ("LORA_PARAMS",),
@@ -239,7 +200,7 @@ class FluxSamplerParams:
     FUNCTION = "execute"
     CATEGORY = "Gayrat/sampling"
 
-    # ────────────────── главный метод узла ────────────────────────────────────
+    # ── основной метод ───────────────────────────────────────────────────────
     def execute(
         self,
         model,
@@ -255,219 +216,155 @@ class FluxSamplerParams:
         denoise,
         loras=None,
     ):
-        """
-        Основной перебор параметров и вызов сэмплера
-        """
+        is_flow = model.model.model_type == comfy.model_base.ModelType.FLOW
 
-        is_schnell = model.model.model_type == comfy.model_base.ModelType.FLOW
+        # сиды
+        noise_seeds = [
+            random.randint(0, 999_999) if "?" in n else int(n)
+            for n in seed.replace("\n", ",").split(",")
+            if n.strip() != ""
+        ] or [random.randint(0, 999_999)]
 
-        # ── сиды ──────────────────────────────────────────────────────────────
-        noise = seed.replace("\n", ",").split(",")
-        noise = [random.randint(0, 999_999) if "?" in n else int(n) for n in noise]
-        if not noise:
-            noise = [random.randint(0, 999_999)]
-
-        # ── список сэмплеров ─────────────────────────────────────────────────
+        # список сэмплеров
         if sampler == "*":
             sampler_list = comfy.samplers.KSampler.SAMPLERS
         elif sampler.startswith("!"):
-            exclude = [s.strip("! ") for s in sampler.replace("\n", ",").split(",")]
-            sampler_list = [
-                s
-                for s in comfy.samplers.KSampler.SAMPLERS
-                if s not in exclude
-            ]
+            excl = [s.strip("! ") for s in sampler.replace("\n", ",").split(",")]
+            sampler_list = [s for s in comfy.samplers.KSampler.SAMPLERS if s not in excl]
         else:
             sampler_list = [
-                s.strip()
-                for s in sampler.replace("\n", ",").split(",")
+                s.strip() for s in sampler.replace("\n", ",").split(",")
                 if s.strip() in comfy.samplers.KSampler.SAMPLERS
-            ]
-        if not sampler_list:
-            sampler_list = ["ipndm"]
+            ] or ["ipndm"]
 
-        # ── список планировщиков (без фильтра по REGISTERED) ─────────────────
-        scheduler_list = [s.strip() for s in scheduler.replace("\n", ",").split(",")]
-        if not scheduler_list:
-            scheduler_list = ["simple"]
+        # список планировщиков (без фильтрации по зарегистрированным)
+        scheduler_list = [s.strip() for s in scheduler.replace("\n", ",").split(",")] or ["simple"]
 
-        # ── числовые списки ──────────────────────────────────────────────────
-        steps_list = parse_string_to_list(steps or ("4" if is_schnell else "20"))
-        denoise_list = parse_string_to_list(denoise or "1.0")
-        guidance_list = parse_string_to_list(guidance or "3.5")
-        max_shift_list = parse_string_to_list(max_shift or ("0" if is_schnell else "1.15"))
-        base_shift_list = parse_string_to_list(base_shift or ("1.0" if is_schnell else "0.5"))
+        # числовые списки
+        steps_list     = parse_string_to_list(steps     or ("4"  if is_flow else "20"))
+        denoise_list   = parse_string_to_list(denoise   or "1.0")
+        guidance_list  = parse_string_to_list(guidance  or "3.5")
+        max_shift_list = parse_string_to_list(max_shift or ("0"  if is_flow else "1.15"))
+        base_shift_list= parse_string_to_list(base_shiftor ("1.0" if is_flow else "0.5"))
 
-        # ── обработка conditioning ───────────────────────────────────────────
-        cond_text = None
+        # conditioning
         if isinstance(conditioning, dict) and "encoded" in conditioning:
-            cond_text = conditioning["text"]
-            cond_encoded = conditioning["encoded"]
+            cond_texts = conditioning["text"]
+            cond_enc   = conditioning["encoded"]
         else:
-            cond_encoded = [conditioning]
+            cond_texts = [None]
+            cond_enc   = [conditioning]
 
-        # ── выводы ───────────────────────────────────────────────────────────
+        # подготовка хелперов
+        basicguider  = BasicGuider()
+        sampler_adv  = SamplerCustomAdvanced()
+        latentbatch  = LatentBatch()
+        modelsampling = ModelSamplingAuraFlow() if is_flow else ModelSamplingFlux()
+        width  = latent_image["samples"].shape[3] * 8
+        height = latent_image["samples"].shape[2] * 8
+
+        # LORA
+        lora_strength_len = 1
+        if loras:
+            lora_models    = loras["loras"]
+            lora_strengths = loras["strengths"]
+            lora_strength_len = sum(len(lst) for lst in lora_strengths)
+            self.loraloader = self.loraloader or LoraLoader()
+
+        # прогресс-бар
+        total = (
+            len(cond_enc) * len(noise_seeds) * len(max_shift_list) * len(base_shift_list)
+            * len(guidance_list) * len(sampler_list) * len(scheduler_list)
+            * len(steps_list) * len(denoise_list) * lora_strength_len
+        )
+        pbar = ProgressBar(total) if total > 1 else None
+
+        # выходы
         out_latent = None
         out_params = []
         out_sigmas = None
+        counter = 0
 
-        # ── подготовка хелперов ──────────────────────────────────────────────
-        basicguider = BasicGuider()
-        sampler_adv = SamplerCustomAdvanced()
-        latentbatch = LatentBatch()
-        modelsampling = (
-            ModelSamplingAuraFlow() if is_schnell else ModelSamplingFlux()
-        )
-        width = latent_image["samples"].shape[3] * 8
-        height = latent_image["samples"].shape[2] * 8
-
-        # ── LORA ─────────────────────────────────────────────────────────────
-        lora_strength_len = 1
-        if loras:
-            lora_model = loras["loras"]
-            lora_strengths = loras["strengths"]
-            lora_strength_len = sum(len(lst) for lst in lora_strengths)
-            if self.loraloader is None:
-                self.loraloader = LoraLoader()
-
-        # ── оценка общего числа проходов ─────────────────────────────────────
-        total_samples = (
-            len(cond_encoded)
-            * len(noise)
-            * len(max_shift_list)
-            * len(base_shift_list)
-            * len(guidance_list)
-            * len(sampler_list)
-            * len(scheduler_list)
-            * len(steps_list)
-            * len(denoise_list)
-            * lora_strength_len
-        )
-        current = 0
-        pbar = ProgressBar(total_samples) if total_samples > 1 else None
-
-        # ─────────────────────────────────────────────────────────────────────
-        #  Итеративный перебор всех комбинаций
-        # ─────────────────────────────────────────────────────────────────────
-        for los in range(lora_strength_len):
-            # → подгружаем LoRA (если есть)
+        # ──────────────────────────────────────────────────────────────────────
+        #  перебор всех комбинаций
+        # ──────────────────────────────────────────────────────────────────────
+        for l_idx in range(lora_strength_len):
             patched_model = (
                 self.loraloader.load_lora(
-                    model, None, lora_model[0], lora_strengths[0][los], 0
-                )[0]
-                if loras
-                else model
+                    model, None, lora_models[0], lora_strengths[0][l_idx], 0
+                )[0] if loras else model
             )
 
-            for idx, cond in enumerate(cond_encoded):
-                ct = cond_text[idx] if cond_text else None
+            for c_idx, cond in enumerate(cond_enc):
+                prompt = cond_texts[c_idx] if cond_texts[0] else None
 
-                for n in noise:
-                    noise_node = Noise_RandomNoise(n)
+                for seed_val in noise_seeds:
+                    noise_node = Noise_RandomNoise(seed_val)
 
                     for ms in max_shift_list:
                         for bs in base_shift_list:
                             work_model = (
                                 modelsampling.patch_aura(patched_model, bs)[0]
-                                if is_schnell
-                                else modelsampling.patch(
-                                    patched_model, ms, bs, width, height
-                                )[0]
+                                if is_flow else
+                                modelsampling.patch(patched_model, ms, bs, width, height)[0]
                             )
 
                             for g in guidance_list:
-                                cond_val = conditioning_set_values(
-                                    cond, {"guidance": g}
-                                )
-                                guider = basicguider.get_guider(
-                                    work_model, cond_val
-                                )[0]
+                                cond_val = conditioning_set_values(cond, {"guidance": g})
+                                guider = basicguider.get_guider(work_model, cond_val)[0]
 
-                                for s in sampler_list:
-                                    sampler_obj = comfy.samplers.sampler_object(s)
+                                for samp in sampler_list:
+                                    samp_obj = comfy.samplers.sampler_object(samp)
 
-                                    for sc in scheduler_list:
+                                    for sched in scheduler_list:
                                         for st in steps_list:
-                                            for d in denoise_list:
-                                                # ───── получаем σ-расписание ──
-                                                sigmas = self._scheduler.get_sigmas(
-                                                    work_model, sc, st, d
-                                                )[0]
+                                            for dn in denoise_list:
+                                                sigmas = self._get_sigmas(work_model, sched, st, dn)
                                                 out_sigmas = sigmas
 
-                                                current += 1
+                                                counter += 1
                                                 logging.info(
-                                                    "Sampling %d/%d | seed=%s "
-                                                    "sampler=%s scheduler=%s "
-                                                    "steps=%s guidance=%s "
-                                                    "max_shift=%s base_shift=%s "
-                                                    "denoise=%s%s",
-                                                    current,
-                                                    total_samples,
-                                                    n,
-                                                    s,
-                                                    sc,
-                                                    st,
-                                                    g,
-                                                    ms,
-                                                    bs,
-                                                    d,
-                                                    (
-                                                        f" lora={lora_model[0]} "
-                                                        f"lora_strength={lora_strengths[0][los]}"
-                                                        if loras
-                                                        else ""
-                                                    ),
+                                                    "Sample %d/%d | seed=%s sampler=%s "
+                                                    "scheduler=%s steps=%s guidance=%s "
+                                                    "max_shift=%s base_shift=%s denoise=%s%s",
+                                                    counter, total, seed_val, samp, sched,
+                                                    st, g, ms, bs, dn,
+                                                    f" lora={lora_models[0]} strength={lora_strengths[0][l_idx]}"
+                                                    if loras else ""
                                                 )
 
-                                                start = time.time()
+                                                t0 = time.time()
                                                 latent = sampler_adv.sample(
-                                                    noise_node,
-                                                    guider,
-                                                    sampler_obj,
-                                                    sigmas,
-                                                    latent_image,
+                                                    noise_node, guider, samp_obj, sigmas, latent_image
                                                 )[1]
-                                                elapsed = time.time() - start
+                                                elapsed = time.time() - t0
 
-                                                out_params.append(
-                                                    {
-                                                        "time": elapsed,
-                                                        "seed": n,
-                                                        "width": width,
-                                                        "height": height,
-                                                        "sampler": s,
-                                                        "scheduler": sc,
-                                                        "steps": st,
-                                                        "guidance": g,
-                                                        "max_shift": ms,
-                                                        "base_shift": bs,
-                                                        "denoise": d,
-                                                        "prompt": ct,
-                                                        **(
-                                                            {
-                                                                "lora": lora_model[0],
-                                                                "lora_strength": lora_strengths[0][los],
-                                                            }
-                                                            if loras
-                                                            else {}
-                                                        ),
-                                                    }
-                                                )
+                                                out_params.append({
+                                                    "time":      elapsed,
+                                                    "seed":      seed_val,
+                                                    "width":     width,
+                                                    "height":    height,
+                                                    "sampler":   samp,
+                                                    "scheduler": sched,
+                                                    "steps":     st,
+                                                    "guidance":  g,
+                                                    "max_shift": ms,
+                                                    "base_shift":bs,
+                                                    "denoise":   dn,
+                                                    "prompt":    prompt,
+                                                    **({"lora": lora_models[0],
+                                                        "lora_strength": lora_strengths[0][l_idx]} if loras else {})
+                                                })
 
                                                 out_latent = (
-                                                    latent
-                                                    if out_latent is None
-                                                    else latentbatch.batch(
-                                                        out_latent, latent
-                                                    )[0]
+                                                    latent if out_latent is None
+                                                    else latentbatch.batch(out_latent, latent)[0]
                                                 )
 
                                                 if pbar:
                                                     pbar.update(1)
 
-        # ── результат ────────────────────────────────────────────────────────
-        return (out_latent, out_params, out_sigmas)
+        return out_latent, out_params, out_sigmas
 
 class PlotParameters:
     @classmethod
