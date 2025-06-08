@@ -15,23 +15,30 @@ import torch
 import comfy.model_base
 import comfy.samplers
 
-# ──   узлы/утилиты, которые уже есть в ComfyUI  ───────────────────────────────
-from nodes import (
-    BasicGuider,
-    SamplerCustomAdvanced,
-    LatentBatch,
-    ModelSamplingFlux,
-    ModelSamplingAuraFlow,
-    Noise_RandomNoise,
-    ProgressBar,
-    OptimalStepsScheduler,       # ← наш «особый» узел
-    LoraLoader,
-)
+from comfy_extras.nodes_custom_sampler import Noise_RandomNoise, BasicGuider, SamplerCustomAdvanced
+from comfy_extras.nodes_latent import LatentBatch
+from comfy_extras.nodes_model_advanced import ModelSamplingFlux, ModelSamplingAuraFlow
+# from node_helpers import conditioning_set_values, parse_string_to_list
+from nodes import LoraLoader
+from comfy.utils import ProgressBar
 
-from utils import (
-    parse_string_to_list,
-    conditioning_set_values,
-)
+# # ──   узлы/утилиты, которые уже есть в ComfyUI  ───────────────────────────────
+# from nodes import (
+#     # BasicGuider,
+#     SamplerCustomAdvanced,
+#     LatentBatch,
+#     ModelSamplingFlux,
+#     ModelSamplingAuraFlow,
+#     Noise_RandomNoise,
+#     ProgressBar,
+#     OptimalStepsScheduler,       # ← наш «особый» узел
+#     LoraLoader,
+# )
+#
+# from utils import (
+#     parse_string_to_list,
+#     conditioning_set_values,
+# )
 
 
 import torch.nn.functional as F
@@ -186,8 +193,8 @@ class FluxSamplerParams:
                 "scheduler": ("STRING", {"default": "simple"}),
                 "steps": ("STRING", {"default": "20"}),
                 "guidance": ("STRING", {"default": "3.5"}),
-                "max_shift": ("STRING", {"default": ""}),
-                "base_shift": ("STRING", {"default": ""}),
+                "max_shift": ("STRING", {"default": "1.15"}),
+                "base_shift": ("STRING", {"default": "0.5"}),
                 "denoise": ("STRING", {"default": "1.0"}),
             },
             "optional": {
@@ -245,6 +252,8 @@ class FluxSamplerParams:
         denoise_list   = parse_string_to_list(denoise   or "1.0")
         guidance_list  = parse_string_to_list(guidance  or "3.5")
         max_shift_list = parse_string_to_list(max_shift or ("0"  if is_flow else "1.15"))
+
+        print("\n base_shift:", base_shift)
         base_shift_list= parse_string_to_list(base_shift  ("1.0" if is_flow else "0.5"))
 
         # conditioning
