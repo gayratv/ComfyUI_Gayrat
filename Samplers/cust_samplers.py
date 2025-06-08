@@ -235,7 +235,7 @@ class FluxSamplerParams:
             sampler_list = [
                 s.strip() for s in sampler.replace("\n", ",").split(",")
                 if s.strip() in comfy.samplers.KSampler.SAMPLERS
-            ] or ["ipndm"]
+            ] or ["euler"]
 
         # список планировщиков (без фильтрации по зарегистрированным)
         scheduler_list = [s.strip() for s in scheduler.replace("\n", ",").split(",")] or ["simple"]
@@ -245,7 +245,7 @@ class FluxSamplerParams:
         denoise_list   = parse_string_to_list(denoise   or "1.0")
         guidance_list  = parse_string_to_list(guidance  or "3.5")
         max_shift_list = parse_string_to_list(max_shift or ("0"  if is_flow else "1.15"))
-        base_shift_list= parse_string_to_list(base_shiftor ("1.0" if is_flow else "0.5"))
+        base_shift_list= parse_string_to_list(base_shift  ("1.0" if is_flow else "0.5"))
 
         # conditioning
         if isinstance(conditioning, dict) and "encoded" in conditioning:
