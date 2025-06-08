@@ -106,7 +106,14 @@ class SchedulerSelectHelper:
     CATEGORY = "Gayrat/sampling"
 
     def execute(self, **values):
+        """
+        Returns a comma-separated list of selected schedulers.
+        Ensures 'OptimalStepsScheduler' is always present in the output.
+        """
         selected = [name for name, val in values.items() if val]
+        # Always include OptimalStepsScheduler
+        if "OptimalStepsScheduler" not in selected:
+            selected.append("OptimalStepsScheduler")
         return (", ".join(selected),)
 
 # Flux sampler parameters with internal scheduler helper
