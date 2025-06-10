@@ -59,3 +59,4 @@ https://github.com/melMass/comfy_mtb/blob/7e89e96e9d83d7753a64a528df0828eb82a5f2
 
 fork from
 https://github.com/GavChap/ComfyUI-SD3LatentSelectRes
+  
