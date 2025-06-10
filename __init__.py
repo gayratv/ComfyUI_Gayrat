@@ -11,10 +11,16 @@ from .SaveImageAndMask.save_image_with_alpha import SaveImageWithAlpha
 from .SaveImageAndMask.LoadImageWithTrimOptions import LoadImageWithTrimOptions
 from .SaveImageAndMask.сustom_load_image import CustomLoadImage
 
+
+
 # Импорт пользовательских нод из Samplers/cust_samplers.py
 from .Samplers.cust_samplers import (
     NODE_CLASS_MAPPINGS as CUST_NODE_CLASS_MAPPINGS,
     NODE_DISPLAY_NAME_MAPPINGS as CUST_NODE_DISPLAY_NAME_MAPPINGS
+)
+from .nodes_py.ModelResolutionSelector import (
+    NODE_CLASS_MAPPINGS as CUST_NODE_CLASS_MAPPINGS2,
+    NODE_DISPLAY_NAME_MAPPINGS as CUST_NODE_DISPLAY_NAME_MAPPINGS2
 )
 
 # Список узлов, которые будут зарегистрированы в ComfyUI
@@ -29,9 +35,6 @@ NODE_CLASS_MAPPINGS = {
     "LoadImageCustomFromFileWithSizeCorrectMask": CustomLoadImage,
 }
 
-# Обновляем основную карту узлов пользовательскими
-NODE_CLASS_MAPPINGS.update(CUST_NODE_CLASS_MAPPINGS)
-
 # Отображаемые имена узлов в UI
 NODE_DISPLAY_NAME_MAPPINGS = {
     "GoogleTranslateCLIPTextEncode": "Google Translate (CLIP Text Encode)",
@@ -44,5 +47,11 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "LoadImageCustomFromFileWithSizeCorrectMask": "Load Image (Custom, Correct Mask Size)",
 }
 
+# Обновляем основную карту узлов пользовательскими
+NODE_CLASS_MAPPINGS.update(CUST_NODE_CLASS_MAPPINGS)
+NODE_CLASS_MAPPINGS.update(CUST_NODE_CLASS_MAPPINGS2)
+
+
 # Обновляем отображаемые имена узлов пользовательскими
 NODE_DISPLAY_NAME_MAPPINGS.update(CUST_NODE_DISPLAY_NAME_MAPPINGS)
+NODE_DISPLAY_NAME_MAPPINGS.update(CUST_NODE_DISPLAY_NAME_MAPPINGS2)

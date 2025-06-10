@@ -49,3 +49,13 @@ fork from https://github.com/a-und-b/ComfyUI_MaskAreaCondition
 
 fork from
 https://github.com/MinorBoy/ComfyUI_essentials_mb
+
+## Color Correction
+fork from
+https://github.com/melMass/comfy_mtb/blob/7e89e96e9d83d7753a64a528df0828eb82a5f20d/nodes/image_processing.py#L432
+
+
+## latent с размерами
+
+fork from
+https://github.com/GavChap/ComfyUI-SD3LatentSelectRes
