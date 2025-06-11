@@ -36,13 +36,28 @@ const DEFAULT_SIZES = {
 
 app.registerExtension({
     name: "Gayrat.FluxSDLatentImage",
-
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
         if (nodeData.name === "FluxSDLatentImage") {
             const onNodeCreated = nodeType.prototype.onNodeCreated;
 
             nodeType.prototype.onNodeCreated = function() {
                 const result = onNodeCreated?.apply(this, arguments);
+
+                // Hide duplicate widgets
+                const widgetsToCheck = ["control after generate", "control_after_generate"];
+                let foundFirst = false;
+
+                for (const widget of this.widgets) {
+                    if (widgetsToCheck.includes(widget.name)) {
+                        if (foundFirst) {
+                            // Hide duplicate widget
+                            widget.type = "hidden";
+                            widget.computeSize = () => [0, -4];  // Minimize space
+                        } else {
+                            foundFirst = true;
+                        }
+                    }
+                }
 
                 // Find the widgets
                 const modelWidget = this.widgets.find(w => w.name === "model");
@@ -115,6 +130,9 @@ app.registerExtension({
                 // Initial setup
                 updateSizeOptions();
 
+                // Force node size recalculation
+                this.setSize(this.computeSize());
+
                 return result;
             };
         }
@@ -138,6 +156,26 @@ app.registerExtension({
                     sizeWidget.value = availableSizes[0];
                 }
             }
+
+            // Hide duplicate seed_control widget after load
+            setTimeout(() => {
+                const widgetsToCheck = ["control after generate", "control_after_generate", "seed control", "seed_control"];
+                const foundWidgets = new Set();
+
+                for (const widget of node.widgets) {
+                    const normalizedName = widget.name.replace(/ /g, '_').toLowerCase();
+                    if (foundWidgets.has(normalizedName)) {
+                        // Hide duplicate widget
+                        widget.type = "hidden";
+                        widget.computeSize = () => [0, -4];
+                    } else {
+                        foundWidgets.add(normalizedName);
+                    }
+                }
+
+                // Force node size recalculation
+                node.setSize(node.computeSize());
+            }, 100);
         }
     }
 });

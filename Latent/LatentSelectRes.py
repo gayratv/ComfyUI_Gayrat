@@ -8,12 +8,11 @@ height: 896
 """
 
 
-class FluxSDLatentImage:
+class FluxSDLatentImageGayrat:
     """
     Custom node for creating empty latent images for Flux, SD and SDXL models
     with proper initialization and aspect ratio support
     """
-
     # Model-specific size configurations
     MODEL_SIZES = {
         "SD": {
@@ -39,14 +38,12 @@ class FluxSDLatentImage:
             "9:16": ["512x896", "576x1024", "640x1152", "720x1280", "800x1408", "864x1536", "1088x1920"]
         }
     }
-
     # Default sizes for each model (used as fallback)
     DEFAULT_SIZES = {
         "SD": "512x512",
         "SDXL": "1024x1024",
         "Flux": "896x896"  # Оптимально для экономии памяти
     }
-
     # Model configurations
     MODEL_CONFIGS = {
         "SD": {"channels": 4, "init": "constant", "dtype": torch.float32},
@@ -68,14 +65,18 @@ class FluxSDLatentImage:
                     "default": 1,
                     "min": 1,
                     "max": 64,
-                    "step": 1
+                    "step": 1,
+                    "display": "number"
                 }),
                 "seed": ("INT", {
                     "default": 0,
                     "min": 0,
-                    "max": 0xffffffffffffffff
+                    "max": 0xffffffffffffffff,
+                    "display": "number"
                 }),
-                "control_after_generate": (["randomize", "fixed", "increment", "decrement"],)
+                "seed_control": (["randomize", "fixed", "increment", "decrement"], {
+                    "default": "randomize"
+                })
             }
         }
 
@@ -85,21 +86,21 @@ class FluxSDLatentImage:
     CATEGORY = "Gayrat/latent"
 
     @classmethod
-    def IS_CHANGED(cls, model, aspect_ratio, size, batch_size, seed, control_after_generate):
+    def IS_CHANGED(cls, model, aspect_ratio, size, batch_size, seed, seed_control):
         # Force update when control is not "fixed"
-        if control_after_generate != "fixed":
+        if seed_control != "fixed":
             return float("nan")  # Always update
-        return f"{model}_{aspect_ratio}_{size}_{batch_size}_{seed}_{control_after_generate}"
+        return f"{model}_{aspect_ratio}_{size}_{batch_size}_{seed}_{seed_control}"
 
-    def generate_latent(self, model, aspect_ratio, size, batch_size, seed, control_after_generate):
+    def generate_latent(self, model, aspect_ratio, size, batch_size, seed, seed_control):
         # Handle seed control logic
-        if control_after_generate == "randomize":
+        if seed_control == "randomize":
             # Generate new random seed
             import random
             seed = random.randint(0, 0xffffffffffffffff)
-        elif control_after_generate == "increment":
+        elif seed_control == "increment":
             seed = seed + 1
-        elif control_after_generate == "decrement":
+        elif seed_control == "decrement":
             seed = max(0, seed - 1)
         # "fixed" keeps the original seed value
 
@@ -140,23 +141,25 @@ class FluxSDLatentImage:
         return (width, height, samples, seed)
 
     @classmethod
-    def VALIDATE_INPUTS(cls, model, aspect_ratio, size, batch_size, seed, control_after_generate):
+    def VALIDATE_INPUTS(cls, model, aspect_ratio, size, batch_size, seed, seed_control):
         # Validate that the selected size is appropriate for the model
         valid_sizes = cls.MODEL_SIZES.get(model, {}).get(aspect_ratio, [])
+
         if size not in valid_sizes:
             # Check if size exists in any model's configuration for this aspect ratio
             for m, sizes in cls.MODEL_SIZES.items():
                 if size in sizes.get(aspect_ratio, []):
                     return f"Size {size} is not recommended for {model} model. Consider using sizes: {', '.join(valid_sizes)}"
             return f"Size {size} is not valid for aspect ratio {aspect_ratio}"
+
         return True
 
 
 # ComfyUI node registration
 NODE_CLASS_MAPPINGS = {
-    "FluxSDLatentImage": FluxSDLatentImage
+    "FluxSDLatentImageGayrat": FluxSDLatentImageGayrat
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "FluxSDLatentImage": "Flux/SD Latent Image"
+    "FluxSDLatentImageGayrat": "Flux/SD Latent Image Gayrat"
 }
