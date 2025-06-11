@@ -7,44 +7,51 @@ width: 896
 height: 896
 """
 
+
 class FluxSDLatentImage:
     """
-    Custom node for creating empty latent images for Flux and SD models
+    Custom node for creating empty latent images for Flux, SD and SDXL models
     with proper initialization and aspect ratio support
     """
 
-    # Define available sizes for each aspect ratio (all divisible by 32)
-    SIZES = {
-        "1:1": [
-            "512x512", "640x640", "768x768", "896x896",
-            "1024x1024", "1152x1152", "1280x1280", "1408x1408"
-        ],
-        "4:3": [
-            "512x384", "640x480", "768x576", "896x672",
-            "1024x768", "1152x864", "1280x960", "1408x1056"
-        ],
-        "3:4": [
-            "384x512", "480x640", "576x768", "672x896",
-            "768x1024", "864x1152", "960x1280", "1056x1408"
-        ],
-        "16:9": [
-            "512x288", "640x360", "768x432", "896x512",
-            "1024x576", "1152x640", "1280x720", "1408x800",
-            "1536x864", "1664x960", "1920x1088"
-        ],
-        "9:16": [
-            "288x512", "360x640", "432x768", "512x896",
-            "576x1024", "640x1152", "720x1280", "800x1408",
-            "864x1536", "960x1664", "1088x1920"
-        ]
+    # Model-specific size configurations
+    MODEL_SIZES = {
+        "SD": {
+            "1:1": ["512x512", "640x640", "768x768"],
+            "4:3": ["512x384", "640x480", "768x576"],
+            "3:4": ["384x512", "480x640", "576x768"],
+            "16:9": ["512x288", "640x360", "768x432", "896x512"],
+            "9:16": ["288x512", "360x640", "432x768", "512x896"]
+        },
+        "SDXL": {
+            "1:1": ["768x768", "896x896", "1024x1024", "1152x1152"],
+            "4:3": ["768x576", "896x672", "1024x768", "1152x864"],
+            "3:4": ["576x768", "672x896", "768x1024", "864x1152"],
+            "16:9": ["768x432", "896x512", "1024x576", "1152x640", "1280x720"],
+            "9:16": ["432x768", "512x896", "576x1024", "640x1152", "720x1280"]
+        },
+        "Flux": {
+            # 896x896 - оптимальный размер для экономии памяти
+            "1:1": ["896x896", "1024x1024", "1152x1152", "1280x1280", "1408x1408"],
+            "4:3": ["896x672", "1024x768", "1152x864", "1280x960", "1408x1056"],
+            "3:4": ["672x896", "768x1024", "864x1152", "960x1280", "1056x1408"],
+            "16:9": ["896x512", "1024x576", "1152x640", "1280x720", "1408x800", "1536x864", "1920x1088"],
+            "9:16": ["512x896", "576x1024", "640x1152", "720x1280", "800x1408", "864x1536", "1088x1920"]
+        }
+    }
+
+    # Default sizes for each model (used as fallback)
+    DEFAULT_SIZES = {
+        "SD": "512x512",
+        "SDXL": "1024x1024",
+        "Flux": "896x896"  # Оптимально для экономии памяти
     }
 
     # Model configurations
     MODEL_CONFIGS = {
-        "Flux": {"channels": 16, "init": "random", "dtype": torch.float16},
-        "Flux PRO": {"channels": 16, "init": "random", "dtype": torch.float16},
-        "Flux Ultra": {"channels": 16, "init": "random", "dtype": torch.float16},
-        "SD": {"channels": 4, "init": "constant", "dtype": torch.float32}
+        "SD": {"channels": 4, "init": "constant", "dtype": torch.float32},
+        "SDXL": {"channels": 4, "init": "constant", "dtype": torch.float32},
+        "Flux": {"channels": 16, "init": "random", "dtype": torch.float16}
     }
 
     def __init__(self):
@@ -55,8 +62,8 @@ class FluxSDLatentImage:
         return {
             "required": {
                 "model": (list(cls.MODEL_CONFIGS.keys()),),
-                "aspect_ratio": (list(cls.SIZES.keys()),),
-                "size": (cls.SIZES["1:1"],),  # Default to 1:1 sizes
+                "aspect_ratio": (["1:1", "4:3", "3:4", "16:9", "9:16"],),
+                "size": (cls.MODEL_SIZES["Flux"]["1:1"],),  # Default to Flux 1:1 sizes
                 "batch_size": ("INT", {
                     "default": 1,
                     "min": 1,
@@ -67,7 +74,8 @@ class FluxSDLatentImage:
                     "default": 0,
                     "min": 0,
                     "max": 0xffffffffffffffff
-                })
+                }),
+                "control_after_generate": (["randomize", "fixed", "increment", "decrement"],)
             }
         }
 
@@ -77,11 +85,11 @@ class FluxSDLatentImage:
     CATEGORY = "Gayrat/latent"
 
     @classmethod
-    def IS_CHANGED(cls, model, aspect_ratio, size, batch_size, seed):
+    def IS_CHANGED(cls, model, aspect_ratio, size, batch_size, seed, control_after_generate):
         # This ensures the node updates when inputs change
-        return f"{model}_{aspect_ratio}_{size}_{batch_size}_{seed}"
+        return f"{model}_{aspect_ratio}_{size}_{batch_size}_{seed}_{control_after_generate}"
 
-    def generate_latent(self, model, aspect_ratio, size, batch_size, seed):
+    def generate_latent(self, model, aspect_ratio, size, batch_size, seed, control_after_generate):
         # Parse size string to get width and height
         width, height = map(int, size.split('x'))
 
@@ -106,7 +114,7 @@ class FluxSDLatentImage:
                 dtype=dtype
             )
         else:
-            # For SD models - use constant initialization
+            # For SD/SDXL models - use constant initialization
             latent = torch.ones(
                 [batch_size, channels, latent_height, latent_width],
                 device=self.device,
@@ -119,15 +127,18 @@ class FluxSDLatentImage:
         return (width, height, samples)
 
     @classmethod
-    def VALIDATE_INPUTS(cls, model, aspect_ratio, size, batch_size, seed):
-        # Validate that the selected size matches the aspect ratio
-        if size not in cls.SIZES.get(aspect_ratio, []):
+    def VALIDATE_INPUTS(cls, model, aspect_ratio, size, batch_size, seed, control_after_generate):
+        # Validate that the selected size is appropriate for the model
+        valid_sizes = cls.MODEL_SIZES.get(model, {}).get(aspect_ratio, [])
+        if size not in valid_sizes:
+            # Check if size exists in any model's configuration for this aspect ratio
+            for m, sizes in cls.MODEL_SIZES.items():
+                if size in sizes.get(aspect_ratio, []):
+                    return f"Size {size} is not recommended for {model} model. Consider using sizes: {', '.join(valid_sizes)}"
             return f"Size {size} is not valid for aspect ratio {aspect_ratio}"
         return True
 
 
-
-# Register the advanced node as well
 # ComfyUI node registration
 NODE_CLASS_MAPPINGS = {
     "FluxSDLatentImage": FluxSDLatentImage
@@ -136,4 +147,3 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "FluxSDLatentImage": "Flux/SD Latent Image"
 }
-

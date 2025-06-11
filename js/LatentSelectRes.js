@@ -1,45 +1,44 @@
 import { app } from "../../../scripts/app.js";
 import { ComfyWidgets } from "../../../scripts/widgets.js";
 
-// Define the same data structure as in Python
-const SIZES = {
-    "1:1": [
-        "512x512", "640x640", "768x768", "896x896",
-        "1024x1024", "1152x1152", "1280x1280", "1408x1408"
-    ],
-    "4:3": [
-        "512x384", "640x480", "768x576", "896x672",
-        "1024x768", "1152x864", "1280x960", "1408x1056"
-    ],
-    "3:4": [
-        "384x512", "480x640", "576x768", "672x896",
-        "768x1024", "864x1152", "960x1280", "1056x1408"
-    ],
-    "16:9": [
-        "512x288", "640x360", "768x432", "896x512",
-        "1024x576", "1152x640", "1280x720", "1408x800",
-        "1536x864", "1664x960", "1920x1088"
-    ],
-    "9:16": [
-        "288x512", "360x640", "432x768", "512x896",
-        "576x1024", "640x1152", "720x1280", "800x1408",
-        "864x1536", "960x1664", "1088x1920"
-    ]
+// Model-specific size configurations
+const MODEL_SIZES = {
+    "SD": {
+        "1:1": ["512x512", "640x640", "768x768"],
+        "4:3": ["512x384", "640x480", "768x576"],
+        "3:4": ["384x512", "480x640", "576x768"],
+        "16:9": ["512x288", "640x360", "768x432", "896x512"],
+        "9:16": ["288x512", "360x640", "432x768", "512x896"]
+    },
+    "SDXL": {
+        "1:1": ["768x768", "896x896", "1024x1024", "1152x1152"],
+        "4:3": ["768x576", "896x672", "1024x768", "1152x864"],
+        "3:4": ["576x768", "672x896", "768x1024", "864x1152"],
+        "16:9": ["768x432", "896x512", "1024x576", "1152x640", "1280x720"],
+        "9:16": ["432x768", "512x896", "576x1024", "640x1152", "720x1280"]
+    },
+    "Flux": {
+        // 896x896 - оптимальный размер для экономии памяти
+        "1:1": ["896x896", "1024x1024", "1152x1152", "1280x1280", "1408x1408"],
+        "4:3": ["896x672", "1024x768", "1152x864", "1280x960", "1408x1056"],
+        "3:4": ["672x896", "768x1024", "864x1152", "960x1280", "1056x1408"],
+        "16:9": ["896x512", "1024x576", "1152x640", "1280x720", "1408x800", "1536x864", "1920x1088"],
+        "9:16": ["512x896", "576x1024", "640x1152", "720x1280", "800x1408", "864x1536", "1088x1920"]
+    }
 };
 
-// Model preferred sizes
-const MODEL_PREFERRED_SIZES = {
-    "Flux": "1024",
-    "Flux PRO": "1024",
-    "Flux Ultra": "1024",
-    "SD": "512"
+// Default sizes for each model
+const DEFAULT_SIZES = {
+    "SD": "512x512",
+    "SDXL": "1024x1024",
+    "Flux": "896x896"  // Оптимально для экономии памяти
 };
 
 app.registerExtension({
     name: "Gayrat.FluxSDLatentImage",
 
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
-        if (nodeData.name === "FluxSDLatentImage" || nodeData.name === "FluxSDLatentImageAdvanced") {
+        if (nodeData.name === "FluxSDLatentImage") {
             const onNodeCreated = nodeType.prototype.onNodeCreated;
 
             nodeType.prototype.onNodeCreated = function() {
@@ -55,13 +54,14 @@ app.registerExtension({
                     return result;
                 }
 
-                // Function to update size dropdown
+                // Function to update size dropdown based on model and aspect ratio
                 const updateSizeOptions = () => {
-                    const currentAspectRatio = aspectRatioWidget.value;
                     const currentModel = modelWidget.value;
+                    const currentAspectRatio = aspectRatioWidget.value;
 
-                    // Get available sizes for current aspect ratio
-                    const availableSizes = SIZES[currentAspectRatio] || SIZES["1:1"];
+                    // Get available sizes for current model and aspect ratio
+                    const modelSizes = MODEL_SIZES[currentModel] || MODEL_SIZES["Flux"];
+                    const availableSizes = modelSizes[currentAspectRatio] || modelSizes["1:1"];
 
                     // Store current selection
                     const currentSize = sizeWidget.value;
@@ -69,14 +69,17 @@ app.registerExtension({
                     // Update the options
                     sizeWidget.options.values = availableSizes;
 
-                    // Determine best default size based on model
-                    const preferredSize = MODEL_PREFERRED_SIZES[currentModel] || "1024";
+                    // Determine new size
                     let newSize = currentSize;
 
-                    // If current size is not in new options, or if we should update based on model
+                    // If current size is not in new options
                     if (!availableSizes.includes(currentSize)) {
-                        // Find size containing preferred resolution
-                        newSize = availableSizes.find(s => s.includes(preferredSize)) ||
+                        // Try to find the default size for this model
+                        const defaultSize = DEFAULT_SIZES[currentModel];
+
+                        // Find default size or closest match
+                        newSize = availableSizes.find(s => s === defaultSize) ||
+                                 availableSizes.find(s => s.includes(defaultSize.split('x')[0])) ||
                                  availableSizes[Math.floor(availableSizes.length / 2)];
                     }
 
@@ -119,13 +122,15 @@ app.registerExtension({
 
     // Handle node serialization
     async nodeCreated(node, app) {
-        if (node.comfyClass === "FluxSDLatentImage" || node.comfyClass === "FluxSDLatentImageAdvanced") {
+        if (node.comfyClass === "FluxSDLatentImage") {
             // Ensure size options are correct when loading from saved workflow
+            const modelWidget = node.widgets?.find(w => w.name === "model");
             const aspectRatioWidget = node.widgets?.find(w => w.name === "aspect_ratio");
             const sizeWidget = node.widgets?.find(w => w.name === "size");
 
-            if (aspectRatioWidget && sizeWidget) {
-                const availableSizes = SIZES[aspectRatioWidget.value] || SIZES["1:1"];
+            if (modelWidget && aspectRatioWidget && sizeWidget) {
+                const modelSizes = MODEL_SIZES[modelWidget.value] || MODEL_SIZES["Flux"];
+                const availableSizes = modelSizes[aspectRatioWidget.value] || modelSizes["1:1"];
                 sizeWidget.options.values = availableSizes;
 
                 // Validate current value
