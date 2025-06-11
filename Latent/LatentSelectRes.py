@@ -79,17 +79,30 @@ class FluxSDLatentImage:
             }
         }
 
-    RETURN_TYPES = ("INT", "INT", "LATENT")
-    RETURN_NAMES = ("width", "height", "latent")
+    RETURN_TYPES = ("INT", "INT", "LATENT", "INT")
+    RETURN_NAMES = ("width", "height", "latent", "seed")
     FUNCTION = "generate_latent"
     CATEGORY = "Gayrat/latent"
 
     @classmethod
     def IS_CHANGED(cls, model, aspect_ratio, size, batch_size, seed, control_after_generate):
-        # This ensures the node updates when inputs change
+        # Force update when control is not "fixed"
+        if control_after_generate != "fixed":
+            return float("nan")  # Always update
         return f"{model}_{aspect_ratio}_{size}_{batch_size}_{seed}_{control_after_generate}"
 
     def generate_latent(self, model, aspect_ratio, size, batch_size, seed, control_after_generate):
+        # Handle seed control logic
+        if control_after_generate == "randomize":
+            # Generate new random seed
+            import random
+            seed = random.randint(0, 0xffffffffffffffff)
+        elif control_after_generate == "increment":
+            seed = seed + 1
+        elif control_after_generate == "decrement":
+            seed = max(0, seed - 1)
+        # "fixed" keeps the original seed value
+
         # Parse size string to get width and height
         width, height = map(int, size.split('x'))
 
@@ -124,7 +137,7 @@ class FluxSDLatentImage:
         # Create output dictionary in ComfyUI format
         samples = {"samples": latent}
 
-        return (width, height, samples)
+        return (width, height, samples, seed)
 
     @classmethod
     def VALIDATE_INPUTS(cls, model, aspect_ratio, size, batch_size, seed, control_after_generate):
