@@ -43,21 +43,40 @@ app.registerExtension({
             nodeType.prototype.onNodeCreated = function() {
                 const result = onNodeCreated?.apply(this, arguments);
 
-                // Hide duplicate widgets
-                const widgetsToCheck = ["control after generate", "control_after_generate"];
-                let foundFirst = false;
+                // Remove duplicate widgets
+                const removeDuplicateWidgets = () => {
+                    const widgetNames = new Map();
+                    const widgetsToRemove = [];
 
-                for (const widget of this.widgets) {
-                    if (widgetsToCheck.includes(widget.name)) {
-                        if (foundFirst) {
-                            // Hide duplicate widget
-                            widget.type = "hidden";
-                            widget.computeSize = () => [0, -4];  // Minimize space
+                    // Find all duplicate widgets
+                    for (let i = 0; i < this.widgets.length; i++) {
+                        const widget = this.widgets[i];
+                        const normalizedName = widget.name.replace(/_/g, ' ').toLowerCase();
+
+                        // Check if this is a duplicate of seed_control
+                        if (normalizedName === "seed control" || normalizedName === "control after generate") {
+                            if (widgetNames.has("seed_control")) {
+                                widgetsToRemove.push(i);
+                            } else {
+                                widgetNames.set("seed_control", widget);
+                            }
                         } else {
-                            foundFirst = true;
+                            widgetNames.set(widget.name, widget);
                         }
                     }
-                }
+
+                    // Remove duplicate widgets in reverse order to maintain indices
+                    for (let i = widgetsToRemove.length - 1; i >= 0; i--) {
+                        this.widgets.splice(widgetsToRemove[i], 1);
+                    }
+                };
+
+                // Run immediately and after a delay to catch any delayed widget creation
+                removeDuplicateWidgets();
+                setTimeout(() => {
+                    removeDuplicateWidgets();
+                    this.setSize(this.computeSize());
+                }, 10);
 
                 // Find the widgets
                 const modelWidget = this.widgets.find(w => w.name === "model");
@@ -130,10 +149,27 @@ app.registerExtension({
                 // Initial setup
                 updateSizeOptions();
 
-                // Force node size recalculation
-                this.setSize(this.computeSize());
-
                 return result;
+            };
+
+            // Override addWidget to prevent duplicate creation
+            const origAddWidget = nodeType.prototype.addWidget;
+            nodeType.prototype.addWidget = function(type, name, value, callback, options) {
+                // Check if we're trying to add a duplicate seed control widget
+                const normalizedName = name.replace(/_/g, ' ').toLowerCase();
+                if (normalizedName === "control after generate" || normalizedName === "seed control") {
+                    // Check if we already have a seed control widget
+                    const existingWidget = this.widgets.find(w =>
+                        w.name === "seed_control" ||
+                        w.name === "control after generate" ||
+                        w.name.replace(/_/g, ' ').toLowerCase() === "seed control"
+                    );
+                    if (existingWidget) {
+                        return existingWidget; // Return existing widget instead of creating new one
+                    }
+                }
+
+                return origAddWidget.apply(this, arguments);
             };
         }
     },
@@ -156,26 +192,6 @@ app.registerExtension({
                     sizeWidget.value = availableSizes[0];
                 }
             }
-
-            // Hide duplicate seed_control widget after load
-            setTimeout(() => {
-                const widgetsToCheck = ["control after generate", "control_after_generate", "seed control", "seed_control"];
-                const foundWidgets = new Set();
-
-                for (const widget of node.widgets) {
-                    const normalizedName = widget.name.replace(/ /g, '_').toLowerCase();
-                    if (foundWidgets.has(normalizedName)) {
-                        // Hide duplicate widget
-                        widget.type = "hidden";
-                        widget.computeSize = () => [0, -4];
-                    } else {
-                        foundWidgets.add(normalizedName);
-                    }
-                }
-
-                // Force node size recalculation
-                node.setSize(node.computeSize());
-            }, 100);
         }
     }
 });

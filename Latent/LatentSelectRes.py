@@ -8,7 +8,7 @@ height: 896
 """
 
 
-class FluxSDLatentImageGayrat:
+class FluxSDLatentImage:
     """
     Custom node for creating empty latent images for Flux, SD and SDXL models
     with proper initialization and aspect ratio support
@@ -73,8 +73,10 @@ class FluxSDLatentImageGayrat:
                     "min": 0,
                     "max": 0xffffffffffffffff,
                     "display": "number"
-                }),
-                "seed_control": (["randomize", "fixed", "increment", "decrement"], {
+                })
+            },
+            "optional": {
+                "control_after_generate": (["randomize", "fixed", "increment", "decrement"], {
                     "default": "randomize"
                 })
             }
@@ -86,21 +88,21 @@ class FluxSDLatentImageGayrat:
     CATEGORY = "Gayrat/latent"
 
     @classmethod
-    def IS_CHANGED(cls, model, aspect_ratio, size, batch_size, seed, seed_control):
+    def IS_CHANGED(cls, model, aspect_ratio, size, batch_size, seed, control_after_generate="fixed"):
         # Force update when control is not "fixed"
-        if seed_control != "fixed":
+        if control_after_generate != "fixed":
             return float("nan")  # Always update
-        return f"{model}_{aspect_ratio}_{size}_{batch_size}_{seed}_{seed_control}"
+        return f"{model}_{aspect_ratio}_{size}_{batch_size}_{seed}_{control_after_generate}"
 
-    def generate_latent(self, model, aspect_ratio, size, batch_size, seed, seed_control):
+    def generate_latent(self, model, aspect_ratio, size, batch_size, seed, control_after_generate="randomize"):
         # Handle seed control logic
-        if seed_control == "randomize":
+        if control_after_generate == "randomize":
             # Generate new random seed
             import random
             seed = random.randint(0, 0xffffffffffffffff)
-        elif seed_control == "increment":
+        elif control_after_generate == "increment":
             seed = seed + 1
-        elif seed_control == "decrement":
+        elif control_after_generate == "decrement":
             seed = max(0, seed - 1)
         # "fixed" keeps the original seed value
 
@@ -141,7 +143,12 @@ class FluxSDLatentImageGayrat:
         return (width, height, samples, seed)
 
     @classmethod
-    def VALIDATE_INPUTS(cls, model, aspect_ratio, size, batch_size, seed, seed_control):
+    def VALIDATE_INPUTS(cls, **kwargs):
+        # Extract only the parameters we need for validation
+        model = kwargs.get("model", "Flux")
+        aspect_ratio = kwargs.get("aspect_ratio", "1:1")
+        size = kwargs.get("size", "896x896")
+
         # Validate that the selected size is appropriate for the model
         valid_sizes = cls.MODEL_SIZES.get(model, {}).get(aspect_ratio, [])
 
@@ -157,9 +164,9 @@ class FluxSDLatentImageGayrat:
 
 # ComfyUI node registration
 NODE_CLASS_MAPPINGS = {
-    "FluxSDLatentImageGayrat": FluxSDLatentImageGayrat
+    "FluxSDLatentImage": FluxSDLatentImage
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "FluxSDLatentImageGayrat": "Flux/SD Latent Image Gayrat"
+    "FluxSDLatentImage": "Flux/SD Latent Image"
 }
