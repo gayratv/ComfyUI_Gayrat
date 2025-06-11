@@ -74,7 +74,7 @@ class FluxSDLatentImage:
     RETURN_TYPES = ("INT", "INT", "LATENT")
     RETURN_NAMES = ("width", "height", "latent")
     FUNCTION = "generate_latent"
-    CATEGORY = "latent"
+    CATEGORY = "Gayrat/latent"
 
     @classmethod
     def IS_CHANGED(cls, model, aspect_ratio, size, batch_size, seed):
@@ -126,6 +126,8 @@ class FluxSDLatentImage:
         return True
 
 
+
+# Register the advanced node as well
 # ComfyUI node registration
 NODE_CLASS_MAPPINGS = {
     "FluxSDLatentImage": FluxSDLatentImage
@@ -135,60 +137,3 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "FluxSDLatentImage": "Flux/SD Latent Image"
 }
 
-
-# Additional helper class for dynamic size updates (optional)
-class FluxSDLatentImageAdvanced(FluxSDLatentImage):
-    """
-    Advanced version with dynamic size list updates based on aspect ratio
-    This requires frontend JavaScript modifications for full functionality
-    """
-
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "model": (list(cls.MODEL_CONFIGS.keys()),),
-                "aspect_ratio": (list(cls.SIZES.keys()), {
-                    "default": "1:1"
-                }),
-                "batch_size": ("INT", {
-                    "default": 1,
-                    "min": 1,
-                    "max": 64,
-                    "step": 1
-                }),
-                "seed": ("INT", {
-                    "default": 0,
-                    "min": 0,
-                    "max": 0xffffffffffffffff
-                })
-            },
-            "optional": {
-                "size_override": ("STRING", {
-                    "default": "",
-                    "multiline": False
-                })
-            }
-        }
-
-    def generate_latent(self, model, aspect_ratio, batch_size, seed, size_override=""):
-        # Use size_override if provided, otherwise use default for aspect ratio
-        if size_override and 'x' in size_override:
-            size = size_override
-        else:
-            # Get default size for the aspect ratio
-            sizes = self.SIZES.get(aspect_ratio, ["1024x1024"])
-            # Choose appropriate default based on model
-            if model.startswith("Flux"):
-                # For Flux, prefer 1024x1024 or closest
-                size = next((s for s in sizes if "1024" in s), sizes[len(sizes) // 2])
-            else:
-                # For SD, prefer 512x512 or closest
-                size = next((s for s in sizes if "512" in s), sizes[0])
-
-        return super().generate_latent(model, aspect_ratio, size, batch_size, seed)
-
-
-# Register the advanced node as well
-NODE_CLASS_MAPPINGS["FluxSDLatentImageAdvanced"] = FluxSDLatentImageAdvanced
-NODE_DISPLAY_NAME_MAPPINGS["FluxSDLatentImageAdvanced"] = "Flux/SD Latent Image (Advanced)"

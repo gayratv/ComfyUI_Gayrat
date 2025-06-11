@@ -1,0 +1,2 @@
+find . -type f -name app.js -path "*scripts*"
+find . -type f -name LatentSelectRes.py -path "*Gayrat*"

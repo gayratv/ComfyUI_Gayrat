@@ -4,3 +4,5 @@ settings_nodes
 .venv
 .idea
 /_tmp/
+
+docker-copy.txt

@@ -43,9 +43,11 @@ from comfy.utils import ProgressBar
 
 
 import torch.nn.functional as F
-# import torchvision.transforms.v2 as T
-import torchvision
-T = torchvision.transforms.v2
+
+import torchvision.transforms.v2 as T
+# import torchvision
+# T = torchvision.transforms.v2
+
 
 
 # путь к папке проекта (родитель папки Samplers)
