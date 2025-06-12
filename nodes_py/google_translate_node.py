@@ -118,3 +118,13 @@ class GoogleTranslateTextNode(GoogleTranslateCLIPTextEncodeNode):
         return (text_translated,)
 
 ### =====  GoogleTranslate Nodes [googletrans module] -> end ===== ###
+
+NODE_CLASS_MAPPINGS = {
+    "GoogleTranslateCLIPTextEncode": GoogleTranslateCLIPTextEncodeNode,
+    "GoogleTranslateText": GoogleTranslateTextNode
+}
+
+NODE_DISPLAY_NAME_MAPPINGS = {
+    "GoogleTranslateCLIPTextEncode": "Google Translate (CLIP Text Encode)",
+    "GoogleTranslateText": "Google Translate (Text Only)"
+}

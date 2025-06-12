@@ -1,6 +1,6 @@
 # импорт из Comfy
 
-class EGRYHT:
+class FloatSlider:
 
     def __init__(self):
         self.NODE_NAME = 'Float slider'
@@ -28,3 +28,10 @@ class EGRYHT:
         scaled_number = weight
         return (scaled_number,)
 
+NODE_DISPLAY_NAME_MAPPINGS = {
+    "FLOATSLIDER": "Float slider"
+}
+
+NODE_CLASS_MAPPINGS = {
+    "FLOATSLIDER" : FloatSlider,
+}
