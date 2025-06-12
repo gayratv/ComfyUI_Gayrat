@@ -6,7 +6,7 @@ from .imagefunc import gamma_trans, depthblur_image, radialblur_image, vignette_
 
 
 
-class FilmV2:
+class FilmV2g:
 
     def __init__(self):
         self.NODE_NAME = 'FilmV2'
@@ -39,7 +39,7 @@ class FilmV2:
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("image",)
     FUNCTION = 'film_v2'
-    CATEGORY = '😺dzNodes/LayerFilter'
+    CATEGORY = 'Gayrat/image processing'
 
     def film_v2(self, image, center_x, center_y, saturation, vignette_intensity,
                   grain_method, grain_power, grain_scale, grain_sat, filmgrainer_shadows, filmgrainer_highs,
@@ -89,9 +89,9 @@ class FilmV2:
         return (torch.cat(ret_images, dim=0),)
 
 NODE_CLASS_MAPPINGS = {
-    "LayerFilter: FilmV2": FilmV2
+    "LayerFilter: FilmV2g": FilmV2g
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "LayerFilter: FilmV2": "LayerFilter: Film V2"
+    "LayerFilter: FilmV2g": "LayerFilter: Film V2g"
 }
