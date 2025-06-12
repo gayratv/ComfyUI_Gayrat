@@ -5,3 +5,4 @@ torch
 Pillow
 numpy
 torchvision
+blend_modes
