@@ -1,71 +1,75 @@
-# ComfyUI_Gayrat/__init__.py
+import importlib.util
+import pathlib
+import sys
+from types import ModuleType
+from typing import Dict, Any
 
-from .GoogleTranslateNode.google_translate_node import (
-    GoogleTranslateCLIPTextEncodeNode,
-    GoogleTranslateTextNode
-)
-from .ImageResize.image_scale_by_aspect_ratio_v2 import ImageScaleByAspectRatioV2
-from .ergouzi.EGJDFDHT import EGRYHT
-from .MaskAreaCondition.adaptive_crop_stitch_params_node import AdaptiveParamsWithModelChoice
-from .SaveImageAndMask.save_image_with_alpha import SaveImageWithAlpha
-from .SaveImageAndMask.LoadImageWithTrimOptions import LoadImageWithTrimOptions
-from .SaveImageAndMask.сustom_load_image import CustomLoadImage
+# Central registries that will be progressively filled at runtime
+NODE_CLASS_MAPPINGS: Dict[str, Any] = {}
+NODE_DISPLAY_NAME_MAPPINGS: Dict[str, str] = {}
 
 
+def _import_module_from_path(path: pathlib.Path) -> ModuleType | None:
+    """Safely import a Python module located at an arbitrary *path*.
 
-# Импорт пользовательских нод из Samplers/cust_samplers.py
-from .Samplers.cust_samplers import (
-    NODE_CLASS_MAPPINGS as CUST_NODE_CLASS_MAPPINGS,
-    NODE_DISPLAY_NAME_MAPPINGS as CUST_NODE_DISPLAY_NAME_MAPPINGS
-)
-# from .nodes_py.ModelResolutionSelector import (
-#     NODE_CLASS_MAPPINGS as CUST_NODE_CLASS_MAPPINGS2,
-#     NODE_DISPLAY_NAME_MAPPINGS as CUST_NODE_DISPLAY_NAME_MAPPINGS2
-# )
-from .MaskAreaCondition.adaptive_crop_stitch_params_node import (
-    NODE_CLASS_MAPPINGS as CUST_NODE_CLASS_MAPPINGS3,
-    NODE_DISPLAY_NAME_MAPPINGS as CUST_NODE_DISPLAY_NAME_MAPPINGS3
-)
-from .Latent.LatentSelectRes import (
-    NODE_CLASS_MAPPINGS as CUST_NODE_CLASS_MAPPINGS4,
-    NODE_DISPLAY_NAME_MAPPINGS as CUST_NODE_DISPLAY_NAME_MAPPINGS4
-)
+    Returns the imported module or **None** if the import fails for any reason.
+    """
+    try:
+        spec = importlib.util.spec_from_file_location(path.stem, path)
+        if spec is None or spec.loader is None:  # pragma: no cover
+            raise ImportError(f"Cannot create spec for {path}")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[path.stem] = module  # Allows intra-module relative imports
+        spec.loader.exec_module(module)  # type: ignore[attr-defined]
+        return module
+    except Exception as exc:  # broad catch to keep discovery robust
+        print(f"[load_custom_nodes] Skipped {path}: {exc}", file=sys.stderr)
+        return None
 
-# Список узлов, которые будут зарегистрированы в ComfyUI
-NODE_CLASS_MAPPINGS = {
-    "GoogleTranslateCLIPTextEncode": GoogleTranslateCLIPTextEncodeNode,
-    "GoogleTranslateText": GoogleTranslateTextNode,
-    "ImageResize: ImageScaleByAspectRatio V2": ImageScaleByAspectRatioV2,
-    "EG_RY_HT": EGRYHT,
-    "AdaptiveParamsWithModelChoice": AdaptiveParamsWithModelChoice,
-    "SaveImageWithAlpha": SaveImageWithAlpha,
-    "LoadImageWithTrimOptions": LoadImageWithTrimOptions,
-    "LoadImageCustomFromFileWithSizeCorrectMask": CustomLoadImage,
-}
 
-# Отображаемые имена узлов в UI
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "GoogleTranslateCLIPTextEncode": "Google Translate (CLIP Text Encode)",
-    "GoogleTranslateText": "Google Translate (Text Only)",
-    "ImageResize": "ImageScaleByAspectRatio V2",
-    "EG_RY_HT": "Float slider",
-    "AdaptiveParamsWithModelChoice": "Adaptive Params (Model Choice + Passthrough)",
-    "SaveImageWithAlpha": "Save Image with Alpha",
-    "LoadImageWithTrimOptions": "Load Image (Trim + Full)",
-    "LoadImageCustomFromFileWithSizeCorrectMask": "Load Image (Custom, Correct Mask Size)",
-}
+def load_custom_nodes() -> None:
+    """Discover ``*.py`` files **only in subdirectories** of this script's folder.
+
+    Python files located directly beside this script are ignored; only files in
+    nested subfolders are imported. Any ``NODE_CLASS_MAPPINGS`` or
+    ``NODE_DISPLAY_NAME_MAPPINGS`` they expose are merged into the global
+    registries defined above.
+    """
+
+    root_path = pathlib.Path(__file__).parent.resolve()
+
+    for file_path in root_path.rglob("*.py"):
+        # Skip files that live directly in root_path (want subdirs only)
+        if file_path.parent == root_path:
+            continue
+
+        module = _import_module_from_path(file_path)
+        if module is None:
+            continue
+
+        # Merge NODE_CLASS_MAPPINGS, if present
+        if hasattr(module, "NODE_CLASS_MAPPINGS"):
+            NODE_CLASS_MAPPINGS.update(getattr(module, "NODE_CLASS_MAPPINGS"))
+
+        # Merge NODE_DISPLAY_NAME_MAPPINGS, if present
+        if hasattr(module, "NODE_DISPLAY_NAME_MAPPINGS"):
+            NODE_DISPLAY_NAME_MAPPINGS.update(
+                getattr(module, "NODE_DISPLAY_NAME_MAPPINGS")
+            )
+
+
+if __name__ == "__main__":
+    load_custom_nodes()
+
+    # Developer-friendly output ---------------------------------------------
+    print("Loaded NODE_CLASS_MAPPINGS:")
+    for k, v in NODE_CLASS_MAPPINGS.items():
+        print(f"  {k}: {v}")
+
+    print("\nLoaded NODE_DISPLAY_NAME_MAPPINGS:")
+    for k, v in NODE_DISPLAY_NAME_MAPPINGS.items():
+        print(f"  {k}: {v}")
+
 
 WEB_DIRECTORY = "./js"
-
-# Обновляем основную карту узлов пользовательскими
-NODE_CLASS_MAPPINGS.update(CUST_NODE_CLASS_MAPPINGS)
-# NODE_CLASS_MAPPINGS.update(CUST_NODE_CLASS_MAPPINGS2)
-NODE_CLASS_MAPPINGS.update(CUST_NODE_CLASS_MAPPINGS3)
-NODE_CLASS_MAPPINGS.update(CUST_NODE_CLASS_MAPPINGS4)
-
-
-# Обновляем отображаемые имена узлов пользовательскими
-NODE_DISPLAY_NAME_MAPPINGS.update(CUST_NODE_DISPLAY_NAME_MAPPINGS)
-# NODE_DISPLAY_NAME_MAPPINGS.update(CUST_NODE_DISPLAY_NAME_MAPPINGS2)
-NODE_DISPLAY_NAME_MAPPINGS.update(CUST_NODE_DISPLAY_NAME_MAPPINGS3)
-NODE_DISPLAY_NAME_MAPPINGS.update(CUST_NODE_DISPLAY_NAME_MAPPINGS4)
+__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
