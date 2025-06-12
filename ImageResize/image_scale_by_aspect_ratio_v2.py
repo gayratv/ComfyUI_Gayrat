@@ -39,7 +39,7 @@ class ImageScaleByAspectRatioV2:
     RETURN_TYPES = ("IMAGE", "MASK", "BOX", "INT", "INT",)
     RETURN_NAMES = ("image", "mask", "original_size", "width", "height",)
     FUNCTION = 'image_scale_by_aspect_ratio'
-    CATEGORY = 'Gayrat'
+    CATEGORY = 'Gayrat/image processing'
 
     def image_scale_by_aspect_ratio(self, aspect_ratio, proportional_width, proportional_height,
                                     fit, method, round_to_multiple, scale_to_side, scale_to_length,
@@ -183,5 +183,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ImageResize: ImageScaleByAspectRatio V2": "LayerUtility: ImageScaleByAspectRatio V2"
+    "ImageResize: ImageScaleByAspectRatio V2": "ImageScaleByAspectRatio V2"
 }
