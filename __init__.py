@@ -59,6 +59,9 @@ def load_custom_nodes() -> None:
 
 
 if __name__ == "__main__":
+    # Show where we're looking before we start
+    print("[load_custom_nodes Gayrat] Scanning subdirectories for *.py modules...")
+
     load_custom_nodes()
 
     # Developer-friendly output ---------------------------------------------
@@ -69,7 +72,3 @@ if __name__ == "__main__":
     print("\nLoaded NODE_DISPLAY_NAME_MAPPINGS:")
     for k, v in NODE_DISPLAY_NAME_MAPPINGS.items():
         print(f"  {k}: {v}")
-
-
-WEB_DIRECTORY = "./js"
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
