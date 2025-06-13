@@ -55,6 +55,9 @@ fork from
 https://github.com/melMass/comfy_mtb/blob/7e89e96e9d83d7753a64a528df0828eb82a5f20d/nodes/image_processing.py#L432
 
 
+## SaveImageJPG
+Нода для сохранения изображений в формате JPG с регулировкой качества.
+
 ## latent с размерами FluxSDLatentImage
 
 fork from
