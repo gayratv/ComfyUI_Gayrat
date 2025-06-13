@@ -23,7 +23,7 @@ class SaveImageJPG:
     RETURN_TYPES = ()
     FUNCTION = "save_images"
     OUTPUT_NODE = True
-    CATEGORY = "Gayrat"
+    CATEGORY = "Gayrat/image processing"
 
     def save_images(self, image, quality=90, filename_prefix="ComfyUI"):
         filename_prefix += self.prefix_append
