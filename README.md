@@ -54,9 +54,13 @@ https://github.com/MinorBoy/ComfyUI_essentials_mb
 fork from
 https://github.com/melMass/comfy_mtb/blob/7e89e96e9d83d7753a64a528df0828eb82a5f20d/nodes/image_processing.py#L432
 
+## Concat Images
+конкатенирует от 2 до 4 изображений в одно для Flux Kontext
 
 ## SaveImageJPG
 Нода для сохранения изображений в формате JPG с регулировкой качества.
+Нужна для Flux Kontext чтобы не превысить лимит 
+Из png в 5200кб делает jpg 672кб
 
 ## latent с размерами FluxSDLatentImage
 
