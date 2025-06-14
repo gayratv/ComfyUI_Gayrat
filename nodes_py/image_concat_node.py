@@ -1,6 +1,9 @@
 import torch
 from PIL import Image
 import numpy as np
+import os
+import random
+import folder_paths
 
 class ConcatImages:
     @classmethod
@@ -10,6 +13,7 @@ class ConcatImages:
                 "image1": ("IMAGE",),
                 "image2": ("IMAGE",),
                 "background_color": ("STRING", {"default": "#000000"}),
+                "layout": (["1*4", "2*2"], {"default": "2*2"}),
             },
             "optional": {
                 "image3": ("IMAGE",),
@@ -42,7 +46,7 @@ class ConcatImages:
                 pass
         return (0, 0, 0)
 
-    def concat(self, image1, image2, background_color, image3=None, image4=None):
+    def concat(self, image1, image2, background_color, layout, image3=None, image4=None):
         imgs = [image1, image2]
         if image3 is not None:
             imgs.append(image3)
@@ -55,22 +59,41 @@ class ConcatImages:
         max_w = max(img.width for img in pil_images)
         max_h = max(img.height for img in pil_images)
 
-        if len(pil_images) == 2:
-            new_im = Image.new('RGB', (max_w * 2, max_h), color=bg_color)
-            new_im.paste(pil_images[0], (0, 0))
-            new_im.paste(pil_images[1], (max_w, 0))
-        elif len(pil_images) in (3, 4):
-            new_im = Image.new('RGB', (max_w * 2, max_h * 2), color=bg_color)
-            new_im.paste(pil_images[0], (0, 0))
-            new_im.paste(pil_images[1], (max_w, 0))
-            if len(pil_images) >= 3:
-                new_im.paste(pil_images[2], (0, max_h))
-            if len(pil_images) == 4:
-                new_im.paste(pil_images[3], (max_w, max_h))
+        if layout == "1*4":
+            count = min(len(pil_images), 4)
+            new_im = Image.new('RGB', (max_w * count, max_h), color=bg_color)
+            for idx in range(count):
+                new_im.paste(pil_images[idx], (max_w * idx, 0))
+        elif layout == "2*2":
+            if len(pil_images) == 2:
+                new_im = Image.new('RGB', (max_w * 2, max_h), color=bg_color)
+                new_im.paste(pil_images[0], (0, 0))
+                new_im.paste(pil_images[1], (max_w, 0))
+            elif len(pil_images) in (3, 4):
+                new_im = Image.new('RGB', (max_w * 2, max_h * 2), color=bg_color)
+                new_im.paste(pil_images[0], (0, 0))
+                new_im.paste(pil_images[1], (max_w, 0))
+                if len(pil_images) >= 3:
+                    new_im.paste(pil_images[2], (0, max_h))
+                if len(pil_images) == 4:
+                    new_im.paste(pil_images[3], (max_w, max_h))
+            else:
+                raise ValueError("Expected 2 to 4 images")
         else:
-            raise ValueError("Expected 2 to 4 images")
+            raise ValueError("Unexpected layout value")
 
-        return (self._pil_to_tensor(new_im),)
+        tensor = self._pil_to_tensor(new_im)
+
+        # save preview image similar to PreviewImage node
+        temp_dir = folder_paths.get_temp_directory()
+        os.makedirs(temp_dir, exist_ok=True)
+        filename = f"concat_{random.randint(0, 99999999):08d}.png"
+        filepath = os.path.join(temp_dir, filename)
+        new_im.save(filepath)
+
+        ui = {"images": [{"filename": filename, "subfolder": "", "type": "temp"}]}
+
+        return (tensor, {"ui": ui})
 
 
 NODE_CLASS_MAPPINGS = {
