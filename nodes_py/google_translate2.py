@@ -1,59 +1,65 @@
 import asyncio
 from googletrans import Translator
 
+# --- Вспомогательный код (без изменений) ---
 
-# Функция для выполнения блокирующего кода перевода.
-# Мы выносим ее отдельно, чтобы было удобнее передать в executor.
-def do_translation(text):
-    if not text.strip():
+translator = Translator()
+
+
+def run_async(coro):
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    if loop.is_running():
+        future = asyncio.run_coroutine_threadsafe(coro, loop)
+        return future.result()
+    else:
+        return loop.run_until_complete(coro)
+
+
+async def do_translation(text):
+    if not text or not text.strip():
         return ""
     try:
-        translator = Translator()
-        translation = translator.translate(text, dest='en')
-        return translation.text
+        translate_result = await translator.translate(text, src="auto", dest="en")
+        return translate_result.text if hasattr(translate_result, "text") else ""
     except Exception as e:
-        print(f"Ошибка перевода: {e}")
-        return f"Ошибка: {e}"
+        print(f"Translation error: {e}")
+        return f"Translation error: {e}"
 
+
+# --- Наш узел ---
 
 class GoogleTranslateNode2:
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(cls):
         return {
             "required": {
-                "text_1": ("STRING", {"multiline": True, "default": "Привет, мир!"}),
-            },
+                "text_to_translate": ("STRING", {"multiline": True, "default": "A beautiful cat in a fantasy world"}),
+            }
         }
 
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("translated_text",)
+    FUNCTION = "execute"
 
-    # Меняем имя функции на асинхронное
-    FUNCTION = "translate_text_async"
-
+    # ИЗМЕНЕНИЕ: Категория узла обновлена
     CATEGORY = "Gayrat/translate"
 
-    # Создаем асинхронную версию нашей функции, добавляя 'async def'
-    async def translate_text_async(self, text_1):
-        # Получаем текущий цикл событий asyncio, на котором работает ComfyUI
-        loop = asyncio.get_running_loop()
-
-        # Запускаем нашу блокирующую функцию 'do_translation' в отдельном потоке
-        # и ждем ее завершения, не блокируя основной поток.
-        # 'None' в качестве первого аргумента означает использование executor'а по умолчанию (ThreadPoolExecutor).
-        translated_text = await loop.run_in_executor(
-            None, do_translation, text_1
+    def execute(self, text_to_translate):
+        translated_text = run_async(
+            do_translation(text_to_translate)
         )
-
-
         return {"result": (translated_text,), "ui": {"translated_text": [translated_text]}}
-        # return (translated_text, {"ui": {"translated_text": [translated_text]}})
 
 
-# --- Регистрация узла остается без изменений ---
+# --- Регистрация узла ---
 NODE_CLASS_MAPPINGS = {
     "GoogleTranslateNode2": GoogleTranslateNode2
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "GoogleTranslateNode2": "Google Translate2"
+    "GoogleTranslateNode2": "Google Translate 2"
 }

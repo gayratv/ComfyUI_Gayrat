@@ -105,7 +105,7 @@ class GoogleTranslateTextNode(GoogleTranslateCLIPTextEncodeNode):
     RETURN_NAMES = ("text",)
     FUNCTION = "translate_text"
 
-    CATEGORY = "Gayrat"
+    CATEGORY = "Gayrat/translate"
 
     def translate_text(self, **kwargs):
         from_translate = kwargs.get("from_translate")
