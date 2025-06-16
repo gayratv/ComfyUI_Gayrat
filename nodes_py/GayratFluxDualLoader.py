@@ -76,18 +76,14 @@ class GayratFluxEncoder:
     CATEGORY = "Gayrat/conditioning"
 
     def encode(self, clip, prompt_for_clip_l, prompt_for_t5):
-        # --- ДОБАВЛЕНО ДЛЯ ОТЛАДКИ ---
-        print("[Gayrat Encoder] Attributes of clip.cond_stage_model:")
-        print(dir(clip.cond_stage_model))
-        # ---------------------------
-        # Проверяем, что на вход подали правильный объект
-        if not hasattr(clip.cond_stage_model, 'clip_l') or not hasattr(clip.cond_stage_model, 't5'):
+        # Проверяем, что на вход подали правильный объект. Теперь ищем 't5xxl'.
+        if not hasattr(clip.cond_stage_model, 'clip_l') or not hasattr(clip.cond_stage_model, 't5xxl'):
             raise TypeError(
                 "Эта нода предназначена для работы только с моделью FLUX. Убедитесь, что вы используете 'GayratFluxDualLoader'.")
 
-        # "Вытаскиваем" внутренние модели
+        # "Вытаскиваем" внутренние модели, используя правильные имена атрибутов.
         clip_l_model = clip.cond_stage_model.clip_l
-        t5_model = clip.cond_stage_model.t5
+        t5_model = clip.cond_stage_model.t5xxl
 
         # Кодируем короткий промпт для CLIP-L
         tokens_l = clip_l_model.tokenize(prompt_for_clip_l)
