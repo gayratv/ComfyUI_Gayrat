@@ -31,7 +31,7 @@ class GoogleTranslateNode2:
     # Меняем имя функции на асинхронное
     FUNCTION = "translate_text_async"
 
-    CATEGORY = "Text"
+    CATEGORY = "Gayrat/translate"
 
     # Создаем асинхронную версию нашей функции, добавляя 'async def'
     async def translate_text_async(self, text_1):
@@ -45,8 +45,9 @@ class GoogleTranslateNode2:
             None, do_translation, text_1
         )
 
-        # Возвращаем результат точно так же, как и раньше
-        return (translated_text, {"ui": {"translated_text": [translated_text]}})
+
+        return {"result": (translated_text,), "ui": {"translated_text": [translated_text]}}
+        # return (translated_text, {"ui": {"translated_text": [translated_text]}})
 
 
 # --- Регистрация узла остается без изменений ---

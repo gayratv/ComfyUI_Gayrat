@@ -77,7 +77,7 @@ class GoogleTranslateCLIPTextEncodeNode:
     )
     FUNCTION = "translate_text"
     DESCRIPTION = "This is a node that translates the prompt into another language using Google Translate."
-    CATEGORY = "Gayrat"
+    CATEGORY = "Gayrat/translate"
 
     def translate_text(self, **kwargs):
         from_translate = kwargs.get("from_translate")
