@@ -84,9 +84,14 @@ class GayratFluxEncoder:
         clip_l_model = clip.cond_stage_model.clip_l
         t5_model = clip.cond_stage_model.t5xxl
 
-        # "Вытаскиваем" внутренние ТОКЕНИЗАТОРЫ из главного объекта clip
-        clip_l_tokenizer = clip.tokenizer.clip_l_tokenizer
-        t5_tokenizer = clip.tokenizer.t5_tokenizer
+        # --- ДОБАВЛЕНО ДЛЯ ОТЛАДКИ ---
+        print("[Gayrat Encoder] Attributes of clip.tokenizer:")
+        print(dir(clip.tokenizer))
+        # ---------------------------
+
+        # "Вытаскиваем" внутренние ТОКЕНИЗАТОРЫ, используя правильные имена.
+        clip_l_tokenizer = clip.tokenizer.clip_l
+        t5_tokenizer = clip.tokenizer.t5
 
         # Кодируем короткий промпт для CLIP-L
         tokens_l = clip_l_tokenizer.tokenize_with_weights(prompt_for_clip_l, return_word_ids=False)[0]
