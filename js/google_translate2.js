@@ -2,6 +2,8 @@ import { app } from "../../../scripts/app.js";
 import { ComfyWidgets } from "../../../scripts/widgets.js";
 
 const nodeName = "GoogleTranslateNode2";
+const nodeName2 = "GoogleTranslateNode2CLIPTextEncodeNode";
+const nodeNameArr = [nodeName2,nodeName];
 
 app.registerExtension({
 	name: "Gayrat.GoogleTranslateNode2.Final",
@@ -11,7 +13,8 @@ app.registerExtension({
 	 * Это гарантирует, что все экземпляры узла будут иметь нужную логику.
 	 */
 	async beforeRegisterNodeDef(nodeType, nodeData, app) {
-		if (nodeData.name === nodeName) {
+		// if (nodeData.name === nodeName ) {
+		if ( nodeNameArr.includes( nodeData.name ) ) {
 			// Сохраняем оригинальную функцию onExecuted
 			const onExecuted = nodeType.prototype.onExecuted;
 
@@ -38,7 +41,8 @@ app.registerExtension({
 	 * Здесь мы добавляем сам виджет.
 	 */
 	nodeCreated(node) {
-		if (node.comfyClass === nodeName) {
+		if ( nodeNameArr.includes( node.comfyClass ) ) {
+		// if (node.comfyClass === nodeName) {
 			// Создаём стандартный многострочный виджет для вывода текста
 			const widget = ComfyWidgets.STRING(node, "text_output", ["STRING", { multiline: true }], app);
 

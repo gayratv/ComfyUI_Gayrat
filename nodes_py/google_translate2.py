@@ -54,38 +54,41 @@ class GoogleTranslateNode2:
 # --- Узел ---
 class GoogleTranslateNode2CLIPTextEncodeNode:
     @classmethod
-    def INPUT_TYPES(cls):
-        return { "required":
-                     {
-                         "text_to_translate": ("STRING", {"multiline": True, "default": ""}),
-                         "clip": ("CLIP",),
-                       },
-                }
+    def INPUT_TYPES(self):
+        return {
+            "required": {
+                "text_to_translate": ("STRING", {"multiline": True, "placeholder": "Input prompt"}),
+                "clip": ("CLIP",),
+            }
+        }
 
-    RETURN_TYPES = ("CONDITIONING","STRING",)
+    RETURN_TYPES = (
+        "CONDITIONING",
+        "STRING",
+    )
     RETURN_NAMES = ("CONDITIONING","translated_text",)
     FUNCTION = "execute"
     CATEGORY = "Gayrat/translate"
     DESCRIPTION = "This is a node that translates the prompt into another language using Google Translate."
 
-    # def execute(self, text_to_translate):
     def execute(self, **kwargs):
-        text_to_translate = kwargs.get("text")
+        text_to_translate = kwargs.get("text_to_translate")
         clip = kwargs.get("clip")
         translated_text = run_async(do_translation(text_to_translate))
 
         tokens = clip.tokenize(translated_text)
         cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
 
-        # CONDITIONIG
-        # return ([[cond, {"pooled_output": pooled}]], translated_text)
+
         conditioning = [[cond, {"pooled_output": pooled}]]
 
-        # return_dict = {"result": (translated_text,), "ui": {"text": [translated_text]}}
-        # Возвращаем и CONDITIONING, и переведенный текст в соответствии с RETURN_TYPES
         return_dict = {"result": (conditioning, translated_text), "ui": {"text": [translated_text]}}
-
         return return_dict
+
+        # return (conditioning, translated_text)
+
+        # return ([[cond, {"pooled_output": pooled}]], translated_text)
+
 
 # --- Регистрация узла ---
 NODE_CLASS_MAPPINGS = {
