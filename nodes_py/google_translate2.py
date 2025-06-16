@@ -39,15 +39,9 @@ class GoogleTranslateNode2:
     CATEGORY = "Gayrat/translate"
 
     def execute(self, text_to_translate):
-        # --- Отладочный вывод в консоль сервера ---
-        print("\n[GoogleTranslateNode2 Debug] ---> Запуск узла.")
         translated_text = run_async(do_translation(text_to_translate))
-        print(f"[GoogleTranslateNode2 Debug] Результат перевода: '{translated_text[:100]}...'") # Выводим первые 100 символов
 
         return_dict = {"result": (translated_text,), "ui": {"text": [translated_text]}}
-        print(f"[GoogleTranslateNode2 Debug] Возвращаю в UI: {return_dict}")
-        print("[GoogleTranslateNode2 Debug] ---< Конец выполнения.\n")
-        # --------------------------------------------
 
         return return_dict
 
@@ -76,11 +70,19 @@ class GoogleTranslateNode2CLIPTextEncodeNode:
         clip = kwargs.get("clip")
         translated_text = run_async(do_translation(text_to_translate))
 
+        if clip is None:
+            raise RuntimeError(
+                "ERROR: clip input is invalid: None\n\nIf the clip is from a checkpoint loader node your checkpoint does not contain a valid clip or text encoder model.")
+
+        # tokens = clip.tokenize(translated_text)
+        # cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
+        #
+        #
+        # conditioning = [[cond, {"pooled_output": pooled}]]
+
         tokens = clip.tokenize(translated_text)
-        cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
-
-
-        conditioning = [[cond, {"pooled_output": pooled}]]
+        # conditioning= (clip.encode_from_tokens_scheduled(tokens),)
+        conditioning= clip.encode_from_tokens_scheduled(tokens)
 
         return_dict = {"result": (conditioning, translated_text), "ui": {"text": [translated_text]}}
         return return_dict
