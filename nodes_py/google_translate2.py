@@ -51,6 +51,46 @@ class GoogleTranslateNode2:
 
         return return_dict
 
+# --- Узел ---
+class GoogleTranslateNode2CLIPTextEncodeNode:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return { "required":
+                     {
+                         "text_to_translate": ("STRING", {"multiline": True, "default": ""}),
+                         "clip": ("CLIP",),
+                       },
+                }
+
+    RETURN_TYPES = ("CONDITIONING","STRING",)
+    RETURN_NAMES = ("CONDITIONING","translated_text",)
+    FUNCTION = "execute"
+    CATEGORY = "Gayrat/translate"
+    DESCRIPTION = "This is a node that translates the prompt into another language using Google Translate."
+
+    # def execute(self, text_to_translate):
+    def execute(self, **kwargs):
+        text_to_translate = kwargs.get("text")
+        clip = kwargs.get("clip")
+        translated_text = run_async(do_translation(text_to_translate))
+
+        tokens = clip.tokenize(translated_text)
+        cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
+
+        # CONDITIONIG
+        # return ([[cond, {"pooled_output": pooled}]], translated_text)
+
+
+        return_dict = {"result": (translated_text,), "ui": {"text": [translated_text]}}
+
+        return return_dict
+
 # --- Регистрация узла ---
-NODE_CLASS_MAPPINGS = { "GoogleTranslateNode2": GoogleTranslateNode2 }
-NODE_DISPLAY_NAME_MAPPINGS = { "GoogleTranslateNode2": "Google Translate 2" }
+NODE_CLASS_MAPPINGS = {
+    "GoogleTranslateNode2": GoogleTranslateNode2,
+    "GoogleTranslateNode2CLIPTextEncodeNode": GoogleTranslateNode2CLIPTextEncodeNode,
+}
+NODE_DISPLAY_NAME_MAPPINGS = {
+    "GoogleTranslateNode2": "Google Translate 2" ,
+    "GoogleTranslateNode2CLIPTextEncodeNode": "Google Translate2 (CLIP Text Encode)"
+}
