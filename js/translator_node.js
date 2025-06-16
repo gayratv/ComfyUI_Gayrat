@@ -1,59 +1,51 @@
 import { app } from "../../../scripts/app.js";
 import { ComfyWidgets } from "../../../scripts/widgets.js";
 
-// Добавляем определение узла в ComfyUI
+// Лог 1: Проверяем, что файл вообще загружается
+console.log("Debug: GoogleTranslateNode2 extension script loaded.");
+
 app.registerExtension({
-	name: "Gayrat.GoogleTranslateNode2",
-
-	// Эта функция вызывается при создании узла на графе
+	name: "Comfy.GoogleTranslateNode2",
 	nodeCreated(node) {
-		// Проверяем, является ли созданный узел нашим узлом "GoogleTranslateNode"
+        // Лог 2: Проверяем, что ComfyUI видит создание узлов
+		console.log("Debug: Node created on graph - ", node.title);
+
+		// Проверяем, совпадает ли класс узла с нашим
 		if (node.comfyClass === "GoogleTranslateNode2") {
+            // Лог 3: Это самое важное сообщение. Если вы его видите, значит, связь по имени класса установлена!
+			console.log("Debug: MATCH! Applying custom widget to", node.comfyClass);
 
-			// Создаем виджет для отображения переведенного текста
 			const widget = {
-				type: "customtext", // Уникальный тип виджета
-				name: "translated_text_display", // Имя для доступа к виджету
-
-				// Функция для отрисовки виджета
+				type: "customtext",
+				name: "translated_text_display",
 				draw: function (ctx, node, width, y, height) {
-					// Настройки внешнего вида текста
-					ctx.fillStyle = "#999"; // Цвет текста
+					ctx.fillStyle = "#999";
 					ctx.font = "12px Arial";
 					ctx.textAlign = "left";
-
-					// Получаем текст из значения виджета
-					const text = this.value || "";
+					const text = this.value || "[перевод появится здесь]"; // добавим текст по умолчанию
 					const lines = text.split('\n');
 					let lineY = y;
-
-					// Рисуем каждую строку текста
 					for (const line of lines) {
 						ctx.fillText(line, 10, lineY + 15);
-						lineY += 20; // Сдвигаем Y для следующей строки
+						lineY += 20;
 					}
 				},
 			};
-
-			// Добавляем наш новый виджет к узлу
 			node.addCustomWidget(widget);
-
-			// Сохраняем оригинальную функцию onExecuted
 			const onExecuted = node.onExecuted;
-
-			// Переопределяем функцию onExecuted для нашего узла
 			node.onExecuted = function (message) {
-				// Вызываем оригинальную функцию
 				onExecuted?.apply(this, arguments);
 
-				// Проверяем, есть ли в сообщении от бэкенда данные для нашего UI
+                // Лог 4: Проверяем, доходит ли сообщение от бэкенда после выполнения
+				console.log("Debug: Node executed. Message received:", message);
+
 				if (message?.ui?.translated_text) {
-					// Находим наш виджет по имени
+                    // Лог 5: Проверяем, нашли ли мы нужные данные в сообщении
+					console.log("Debug: UI data found! Text:", message.ui.translated_text[0]);
+
 					const w = this.widgets.find((w) => w.name === "translated_text_display");
 					if (w) {
-						// Обновляем значение виджета
 						w.value = message.ui.translated_text[0];
-						// Запрашиваем перерисовку узла, чтобы отобразить изменения
 						this.setDirty(true);
 					}
 				}
