@@ -89,12 +89,12 @@ class GayratFluxEncoder:
         t5_tokenizer = clip.tokenizer.t5xxl
 
         # Кодируем короткий промпт для CLIP-L
-        tokens_l = clip_l_tokenizer.tokenize_with_weights(prompt_for_clip_l, return_word_ids=False)[0]
-        cond_l, pooled_l = clip_l_model.encode(tokens_l)
+        tokens_l = clip_l_tokenizer.tokenize_with_weights(prompt_for_clip_l, return_word_ids=False)
+        cond_l, pooled_l = clip_l_model.encode_token_weights(tokens_l)
 
         # Кодируем длинный промпт для T5
-        tokens_t5 = t5_tokenizer.tokenize_with_weights(prompt_for_t5, return_word_ids=False)[0]
-        cond_t5, pooled_t5 = t5_model.encode(tokens_t5)
+        tokens_t5 = t5_tokenizer.tokenize_with_weights(prompt_for_t5, return_word_ids=False)
+        cond_t5, pooled_t5 = t5_model.encode_token_weights(tokens_t5)
 
         # Проверяем на None перед конкатенацией
         if pooled_l is None or pooled_t5 is None:
