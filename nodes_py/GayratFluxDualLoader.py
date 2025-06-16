@@ -76,6 +76,10 @@ class GayratFluxEncoder:
     CATEGORY = "Gayrat/conditioning"
 
     def encode(self, clip, prompt_for_clip_l, prompt_for_t5):
+        # --- ДОБАВЛЕНО ДЛЯ ОТЛАДКИ ---
+        print("[Gayrat Encoder] Attributes of clip.cond_stage_model:")
+        print(dir(clip.cond_stage_model))
+        # ---------------------------
         # Проверяем, что на вход подали правильный объект
         if not hasattr(clip.cond_stage_model, 'clip_l') or not hasattr(clip.cond_stage_model, 't5'):
             raise TypeError(
