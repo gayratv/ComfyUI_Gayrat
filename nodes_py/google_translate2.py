@@ -1,10 +1,8 @@
 import asyncio
 from googletrans import Translator
 
-# --- Вспомогательный код (без изменений) ---
-
+# --- Вспомогательный код ---
 translator = Translator()
-
 
 def run_async(coro):
     try:
@@ -19,7 +17,6 @@ def run_async(coro):
     else:
         return loop.run_until_complete(coro)
 
-
 async def do_translation(text):
     if not text or not text.strip():
         return ""
@@ -30,36 +27,30 @@ async def do_translation(text):
         print(f"Translation error: {e}")
         return f"Translation error: {e}"
 
-
-# --- Наш узел ---
-
+# --- Узел ---
 class GoogleTranslateNode2:
     @classmethod
     def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "text_to_translate": ("STRING", {"multiline": True, "default": "A beautiful cat in a fantasy world"}),
-            }
-        }
+        return { "required": { "text_to_translate": ("STRING", {"multiline": True, "default": ""}), } }
 
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("translated_text",)
     FUNCTION = "execute"
-
-    # ИЗМЕНЕНИЕ: Категория узла обновлена
     CATEGORY = "Gayrat/translate"
 
     def execute(self, text_to_translate):
-        translated_text = run_async(
-            do_translation(text_to_translate)
-        )
-        return {"result": (translated_text,), "ui": {"translated_text": [translated_text]}}
+        # --- Отладочный вывод в консоль сервера ---
+        print("\n[GoogleTranslateNode2 Debug] ---> Запуск узла.")
+        translated_text = run_async(do_translation(text_to_translate))
+        print(f"[GoogleTranslateNode2 Debug] Результат перевода: '{translated_text[:100]}...'") # Выводим первые 100 символов
 
+        return_dict = {"result": (translated_text,), "ui": {"text": [translated_text]}}
+        print(f"[GoogleTranslateNode2 Debug] Возвращаю в UI: {return_dict}")
+        print("[GoogleTranslateNode2 Debug] ---< Конец выполнения.\n")
+        # --------------------------------------------
+
+        return return_dict
 
 # --- Регистрация узла ---
-NODE_CLASS_MAPPINGS = {
-    "GoogleTranslateNode2": GoogleTranslateNode2
-}
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "GoogleTranslateNode2": "Google Translate 2"
-}
+NODE_CLASS_MAPPINGS = { "GoogleTranslateNode2": GoogleTranslateNode2 }
+NODE_DISPLAY_NAME_MAPPINGS = { "GoogleTranslateNode2": "Google Translate 2" }
