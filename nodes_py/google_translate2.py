@@ -79,9 +79,11 @@ class GoogleTranslateNode2CLIPTextEncodeNode:
 
         # CONDITIONIG
         # return ([[cond, {"pooled_output": pooled}]], translated_text)
+        conditioning = [[cond, {"pooled_output": pooled}]]
 
-
-        return_dict = {"result": (translated_text,), "ui": {"text": [translated_text]}}
+        # return_dict = {"result": (translated_text,), "ui": {"text": [translated_text]}}
+        # Возвращаем и CONDITIONING, и переведенный текст в соответствии с RETURN_TYPES
+        return_dict = {"result": (conditioning, translated_text), "ui": {"text": [translated_text]}}
 
         return return_dict
 
