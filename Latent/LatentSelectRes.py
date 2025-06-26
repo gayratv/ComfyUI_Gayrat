@@ -46,8 +46,8 @@ class FluxSDLatentImage:
     }
     # Model configurations
     MODEL_CONFIGS = {
-        "SD": {"channels": 4, "init": "constant", "dtype": torch.float32},
-        "SDXL": {"channels": 4, "init": "constant", "dtype": torch.float32},
+        "SD": {"channels": 4, "init": "zeros", "dtype": torch.float32},      # <<< ИЗМЕНЕНО
+        "SDXL": {"channels": 4, "init": "zeros", "dtype": torch.float32},    # <<< ИЗМЕНЕНО
         "Flux": {"channels": 16, "init": "random", "dtype": torch.float16}
     }
 
@@ -130,12 +130,14 @@ class FluxSDLatentImage:
                 dtype=dtype
             )
         else:
-            # For SD/SDXL models - use constant initialization
-            latent = torch.ones(
+            # For SD/SDXL models - use zeros initialization (standard method)
+            # <<< НАЧАЛО ИЗМЕНЕНИЯ
+            latent = torch.zeros(
                 [batch_size, channels, latent_height, latent_width],
                 device=self.device,
                 dtype=dtype
-            ) * 0.0609
+            )
+            # <<< КОНЕЦ ИЗМЕНЕНИЯ
 
         # Create output dictionary in ComfyUI format
         samples = {"samples": latent}
