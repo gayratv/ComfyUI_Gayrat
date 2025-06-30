@@ -63,20 +63,30 @@ class ConcatImages:
             count = min(len(pil_images), 4)
             new_im = Image.new('RGB', (max_w * count, max_h), color=bg_color)
             for idx in range(count):
-                new_im.paste(pil_images[idx], (max_w * idx, 0))
+                img = pil_images[idx]
+                mask = img if img.mode in ("RGBA", "LA") else None
+                new_im.paste(img, (max_w * idx, 0), mask)
         elif layout == "2*2":
             if len(pil_images) == 2:
                 new_im = Image.new('RGB', (max_w * 2, max_h), color=bg_color)
-                new_im.paste(pil_images[0], (0, 0))
-                new_im.paste(pil_images[1], (max_w, 0))
+                mask0 = pil_images[0] if pil_images[0].mode in ("RGBA", "LA") else None
+                mask1 = pil_images[1] if pil_images[1].mode in ("RGBA", "LA") else None
+                new_im.paste(pil_images[0], (0, 0), mask0)
+                new_im.paste(pil_images[1], (max_w, 0), mask1)
             elif len(pil_images) in (3, 4):
                 new_im = Image.new('RGB', (max_w * 2, max_h * 2), color=bg_color)
-                new_im.paste(pil_images[0], (0, 0))
-                new_im.paste(pil_images[1], (max_w, 0))
+                mask0 = pil_images[0] if pil_images[0].mode in ("RGBA", "LA") else None
+                mask1 = pil_images[1] if pil_images[1].mode in ("RGBA", "LA") else None
+                new_im.paste(pil_images[0], (0, 0), mask0)
+                new_im.paste(pil_images[1], (max_w, 0), mask1)
                 if len(pil_images) >= 3:
-                    new_im.paste(pil_images[2], (0, max_h))
+                    img2 = pil_images[2]
+                    mask2 = img2 if img2.mode in ("RGBA", "LA") else None
+                    new_im.paste(img2, (0, max_h), mask2)
                 if len(pil_images) == 4:
-                    new_im.paste(pil_images[3], (max_w, max_h))
+                    img3 = pil_images[3]
+                    mask3 = img3 if img3.mode in ("RGBA", "LA") else None
+                    new_im.paste(img3, (max_w, max_h), mask3)
             else:
                 raise ValueError("Expected 2 to 4 images")
         else:
