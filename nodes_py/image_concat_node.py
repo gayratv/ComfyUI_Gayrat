@@ -12,7 +12,7 @@ class ConcatImages:
             "required": {
                 "image1": ("IMAGE",),
                 "image2": ("IMAGE",),
-                "background_color": ("STRING", {"default": "#000000"}),
+                "background_color": ("COLOR", {"default": "#000000"}),
                 "layout": (["1*4", "2*2"], {"default": "2*2"}),
             },
             "optional": {
