@@ -12,8 +12,10 @@ class ConcatImages:
             "required": {
                 "image1": ("IMAGE",),
                 "image2": ("IMAGE",),
-                "background_color": ("COLOR", {"default": "#000000"}),
-                "layout": (["1*4", "2*2"], {"default": "2*2"}),
+
+                "background_color": ("STRING", {"default": "#000000"}),
+                "layout": (["1*4", "1*3", "2*2"], {"default": "2*2"}),
+
             },
             "optional": {
                 "image3": ("IMAGE",),
@@ -63,6 +65,14 @@ class ConcatImages:
             count = min(len(pil_images), 4)
             new_im = Image.new('RGB', (max_w * count, max_h), color=bg_color)
             for idx in range(count):
+                img = pil_images[idx]
+                mask = img if img.mode in ("RGBA", "LA") else None
+                new_im.paste(img, (max_w * idx, 0), mask)
+        elif layout == "1*3":
+            if image3 is None or image4 is not None:
+                raise ValueError("Layout '1*3' requires image3 and no image4")
+            new_im = Image.new('RGB', (max_w * 3, max_h), color=bg_color)
+            for idx in range(3):
                 img = pil_images[idx]
                 mask = img if img.mode in ("RGBA", "LA") else None
                 new_im.paste(img, (max_w * idx, 0), mask)
