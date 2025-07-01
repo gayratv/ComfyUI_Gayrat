@@ -12,8 +12,10 @@ class ConcatImages:
             "required": {
                 "image1": ("IMAGE",),
                 "image2": ("IMAGE",),
+
                 "background_color": ("STRING", {"default": "#000000"}),
                 "layout": (["1*4", "1*3", "2*2"], {"default": "2*2"}),
+
             },
             "optional": {
                 "image3": ("IMAGE",),
