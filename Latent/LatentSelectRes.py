@@ -70,7 +70,7 @@ class FluxSDLatentImage:
 
     RETURN_TYPES = ("LATENT",)
     FUNCTION = "generate"
-    CATEGORY = "latent/gen"
+    CATEGORY = "Gayrat/latent"
 
     def generate(self, model, width, height, batch_size=1, seed_=0, seed_control="fixed"):
         if seed_control == "increment":
