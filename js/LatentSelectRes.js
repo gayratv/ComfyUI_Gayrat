@@ -1,197 +1,144 @@
 import { app } from "../../../scripts/app.js";
-import { ComfyWidgets } from "../../../scripts/widgets.js";
+import { api } from '../../../scripts/api.js';
 
-// Model-specific size configurations
-const MODEL_SIZES = {
-    "SD": {
-        "1:1": ["512x512", "640x640", "768x768"],
-        "4:3": ["512x384", "640x480", "768x576"],
-        "3:4": ["384x512", "480x640", "576x768"],
-        "16:9": ["512x288", "640x360", "768x432", "896x512"],
-        "9:16": ["288x512", "360x640", "432x768", "512x896"]
-    },
-    "SDXL": {
-        "1:1": ["768x768", "896x896", "1024x1024", "1152x1152"],
-        "4:3": ["768x576", "896x672", "1024x768", "1152x864"],
-        "3:4": ["576x768", "672x896", "768x1024", "864x1152"],
-        "16:9": ["768x432", "896x512", "1024x576", "1152x640", "1280x720"],
-        "9:16": ["432x768", "512x896", "576x1024", "640x1152", "720x1280"]
-    },
-    "Flux": {
-        // 896x896 - оптимальный размер для экономии памяти
-        "1:1": ["896x896", "1024x1024", "1152x1152", "1280x1280", "1408x1408"],
-        "4:3": ["896x672", "1024x768", "1152x864", "1280x960", "1408x1056"],
-        "3:4": ["672x896", "768x1024", "864x1152", "960x1280", "1056x1408"],
-        "16:9": ["896x512", "1024x576", "1152x640", "1280x720", "1408x800", "1536x864", "1920x1088"],
-        "9:16": ["512x896", "576x1024", "640x1152", "720x1280", "800x1408", "864x1536", "1088x1920"]
+// Gayrat: кастомный виджет для выбора предустановленных разрешений
+function showImage(name) {
+    const img = new Image();
+    img.src = name;
+    const parent_element = document.getElementById("gayrat-comfyui-preview-image-div");
+    parent_element.innerHTML = "";
+    parent_element.appendChild(img);
+}
+
+function get_size_by_name(name) {
+    if (!name) {
+        return null;
     }
-};
+    const size = name.split("x");
+    return [parseInt(size[0]), parseInt(size[1])];
+}
 
-// Default sizes for each model
-const DEFAULT_SIZES = {
-    "SD": "512x512",
-    "SDXL": "1024x1024",
-    "Flux": "896x896"  // Оптимально для экономии памяти
-};
-
-app.registerExtension({
-    name: "Gayrat.FluxSDLatentImage",
-    async beforeRegisterNodeDef(nodeType, nodeData, app) {
-        if (nodeData.name === "FluxSDLatentImage") {
-            const onNodeCreated = nodeType.prototype.onNodeCreated;
-
-            nodeType.prototype.onNodeCreated = function() {
-                const result = onNodeCreated?.apply(this, arguments);
-
-                // Remove duplicate widgets
-                const removeDuplicateWidgets = () => {
-                    const widgetNames = new Map();
-                    const widgetsToRemove = [];
-
-                    // Find all duplicate widgets
-                    for (let i = 0; i < this.widgets.length; i++) {
-                        const widget = this.widgets[i];
-                        const normalizedName = widget.name.replace(/_/g, ' ').toLowerCase();
-
-                        // Check if this is a duplicate of seed_control
-                        if (normalizedName === "seed control" || normalizedName === "control after generate") {
-                            if (widgetNames.has("seed_control")) {
-                                widgetsToRemove.push(i);
-                            } else {
-                                widgetNames.set("seed_control", widget);
-                            }
-                        } else {
-                            widgetNames.set(widget.name, widget);
-                        }
-                    }
-
-                    // Remove duplicate widgets in reverse order to maintain indices
-                    for (let i = widgetsToRemove.length - 1; i >= 0; i--) {
-                        this.widgets.splice(widgetsToRemove[i], 1);
-                    }
-                };
-
-                // Run immediately and after a delay to catch any delayed widget creation
-                removeDuplicateWidgets();
-                setTimeout(() => {
-                    removeDuplicateWidgets();
-                    this.setSize(this.computeSize());
-                }, 10);
-
-                // Find the widgets
-                const modelWidget = this.widgets.find(w => w.name === "model");
-                const aspectRatioWidget = this.widgets.find(w => w.name === "aspect_ratio");
-                const sizeWidget = this.widgets.find(w => w.name === "size");
-
-                if (!modelWidget || !aspectRatioWidget || !sizeWidget) {
-                    console.error("FluxSDLatentImage: Could not find required widgets");
-                    return result;
-                }
-
-                // Function to update size dropdown based on model and aspect ratio
-                const updateSizeOptions = () => {
-                    const currentModel = modelWidget.value;
-                    const currentAspectRatio = aspectRatioWidget.value;
-
-                    // Get available sizes for current model and aspect ratio
-                    const modelSizes = MODEL_SIZES[currentModel] || MODEL_SIZES["Flux"];
-                    const availableSizes = modelSizes[currentAspectRatio] || modelSizes["1:1"];
-
-                    // Store current selection
-                    const currentSize = sizeWidget.value;
-
-                    // Update the options
-                    sizeWidget.options.values = availableSizes;
-
-                    // Determine new size
-                    let newSize = currentSize;
-
-                    // If current size is not in new options
-                    if (!availableSizes.includes(currentSize)) {
-                        // Try to find the default size for this model
-                        const defaultSize = DEFAULT_SIZES[currentModel];
-
-                        // Find default size or closest match
-                        newSize = availableSizes.find(s => s === defaultSize) ||
-                                 availableSizes.find(s => s.includes(defaultSize.split('x')[0])) ||
-                                 availableSizes[Math.floor(availableSizes.length / 2)];
-                    }
-
-                    // Set the new value
-                    sizeWidget.value = newSize;
-
-                    // Force widget to update its display
-                    if (sizeWidget.callback) {
-                        sizeWidget.callback(newSize);
-                    }
-                };
-
-                // Store original callbacks
-                const originalModelCallback = modelWidget.callback;
-                const originalAspectRatioCallback = aspectRatioWidget.callback;
-
-                // Override model widget callback
-                modelWidget.callback = function(value) {
-                    if (originalModelCallback) {
-                        originalModelCallback.call(this, value);
-                    }
-                    updateSizeOptions();
-                };
-
-                // Override aspect ratio widget callback
-                aspectRatioWidget.callback = function(value) {
-                    if (originalAspectRatioCallback) {
-                        originalAspectRatioCallback.call(this, value);
-                    }
-                    updateSizeOptions();
-                };
-
-                // Initial setup
-                updateSizeOptions();
-
-                return result;
-            };
-
-            // Override addWidget to prevent duplicate creation
-            const origAddWidget = nodeType.prototype.addWidget;
-            nodeType.prototype.addWidget = function(type, name, value, callback, options) {
-                // Check if we're trying to add a duplicate seed control widget
-                const normalizedName = name.replace(/_/g, ' ').toLowerCase();
-                if (normalizedName === "control after generate" || normalizedName === "seed control") {
-                    // Check if we already have a seed control widget
-                    const existingWidget = this.widgets.find(w =>
-                        w.name === "seed_control" ||
-                        w.name === "control after generate" ||
-                        w.name.replace(/_/g, ' ').toLowerCase() === "seed control"
-                    );
-                    if (existingWidget) {
-                        return existingWidget; // Return existing widget instead of creating new one
-                    }
-                }
-
-                return origAddWidget.apply(this, arguments);
-            };
-        }
+// -- Словарь с разрешениями, который должен совпадать с Python-кодом
+const MODEL_SIZES = {
+	"SD": {
+        "1:1": ["512x512", "640x640", "768x768"],
+        "4:3": ["512x384", "768x576", "1024x768"],
+        "3:2": ["512x344", "768x512", "960x640"],
+        "16:9": ["512x288", "768x432", "1024x576"],
+        "21:9": ["768x320", "1024x432"],
+        "3:4": ["384x512", "576x768", "768x1024"],
+        "2:3": ["344x512", "512x768", "640x960"],
+        "9:16": ["288x512", "432x768", "576x1024"],
+        "9:21": ["320x768", "432x1024"],
+	},
+	"SDXL": {
+		"1:1": ["1024x1024", "896x896", "768x768", "512x512"],
+        "4:3": ["1152x896", "1024x768"],
+        "3:2": ["1216x832", "1024x688", "896x592"],
+        "16:9": ["1344x768", "1216x688", "1024x576"],
+        "21:9": ["1536x640", "1280x544"],
+        "3:4": ["896x1152", "768x1024"],
+        "2:3": ["832x1216", "688x1024", "592x896"],
+        "9:16": ["768x1344", "688x1216", "576x1024"],
+        "9:21": ["640x1536", "544x1280"]
+	},
+    "Flux": {
+        "1:1": ["1024x1024", "896x896", "768x768"],
+        "4:3": ["1152x896", "1024x768"],
+        "3:2": ["1216x832", "1024x688"],
+        "16:9": ["1344x768", "1024x576"],
+        "3:4": ["896x1152", "768x1024"],
+        "2:3": ["832x1216", "688x1024"],
+        "9:16": ["768x1344", "576x1024"],
     },
+    // Для SD3 используются те же разрешения, что и для SDXL
+    "SD3": {
+		"1:1": ["1024x1024", "896x896", "768x768", "512x512"],
+        "4:3": ["1152x896", "1024x768"],
+        "3:2": ["1216x832", "1024x688", "896x592"],
+        "16:9": ["1344x768", "1216x688", "1024x576"],
+        "21:9": ["1536x640", "1280x544"],
+        "3:4": ["896x1152", "768x1024"],
+        "2:3": ["832x1216", "688x1024", "592x896"],
+        "9:16": ["768x1344", "688x1216", "576x1024"],
+        "9:21": ["640x1536", "544x1280"]
+	}
+};
 
-    // Handle node serialization
-    async nodeCreated(node, app) {
-        if (node.comfyClass === "FluxSDLatentImage") {
-            // Ensure size options are correct when loading from saved workflow
-            const modelWidget = node.widgets?.find(w => w.name === "model");
-            const aspectRatioWidget = node.widgets?.find(w => w.name === "aspect_ratio");
-            const sizeWidget = node.widgets?.find(w => w.name === "size");
+function updateWidget(node, widget_name, widget_value) {
+    if (!node.widgets) {
+        return;
+    }
 
-            if (modelWidget && aspectRatioWidget && sizeWidget) {
-                const modelSizes = MODEL_SIZES[modelWidget.value] || MODEL_SIZES["Flux"];
-                const availableSizes = modelSizes[aspectRatioWidget.value] || modelSizes["1:1"];
-                sizeWidget.options.values = availableSizes;
+    const widget = node.widgets.find(w => w.name === widget_name);
+    if (widget) {
+        widget.value = widget_value;
+        if (widget.callback) {
+            widget.callback(widget.value, app.canvas, node, app.graph);
+        }
+    }
 
-                // Validate current value
-                if (!availableSizes.includes(sizeWidget.value)) {
-                    sizeWidget.value = availableSizes[0];
-                }
+    if (widget_name === "model" || widget_name === "aspect_ratio") {
+        const model = node.widgets.find(w => w.name === "model").value;
+        const aspect_ratio = node.widgets.find(w => w.name === "aspect_ratio").value;
+        const size_widget = node.widgets.find(w => w.name === "size");
+
+        let default_size;
+        if (model === 'Flux') {
+            default_size = "896x896";
+        } else if (model === 'SD' || model === 'SDXL' || model === 'SD3') {
+            default_size = "1024x1024";
+        }
+
+        const sizes = MODEL_SIZES[model][aspect_ratio] || [default_size];
+        size_widget.options.values = sizes;
+
+        if (!sizes.includes(size_widget.value)) {
+            size_widget.value = sizes[0];
+            if (size_widget.callback) {
+                size_widget.callback(size_widget.value, app.canvas, node, app.graph);
             }
         }
     }
+}
+
+app.registerExtension({
+	name: "gayrat.LatentSelectRes",
+	async beforeRegisterNodeDef(nodeType, nodeData, app) {
+		if (nodeData.name === 'FluxSDLatentImage') {
+			const onNodeCreated = nodeType.prototype.onNodeCreated;
+			nodeType.prototype.onNodeCreated = function () {
+				onNodeCreated ? onNodeCreated.apply(this, arguments) : undefined;
+
+                // Предотвращение дублирования виджетов
+                if (this.widgets && this.widgets.some(w => w.name === 'aspect_ratio')) {
+                    return;
+                }
+
+				const aspect_ratio_widget = this.addWidget("combo", "aspect_ratio", "1:1", (value) => {
+                    updateWidget(this, "aspect_ratio", value);
+                }, {
+                    values: Object.keys(MODEL_SIZES["Flux"])
+                });
+
+				const size_widget = this.addWidget("combo", "size", "1024x1024", (value) => {
+					const wh = get_size_by_name(value);
+					if (wh) {
+						updateWidget(this, "width", wh[0]);
+						updateWidget(this, "height", wh[1]);
+					}
+				}, {
+                    values: MODEL_SIZES["Flux"]["1:1"]
+                });
+
+                // Привязка обратных вызовов для виджетов
+                this.widgets.find(w => w.name === 'model').callback = (value) => {
+                    updateWidget(this, 'model', value);
+                };
+
+                // Начальная инициализация
+                updateWidget(this, "model", this.widgets.find(w => w.name === 'model').value);
+			};
+		}
+	},
 });
