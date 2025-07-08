@@ -105,3 +105,13 @@ MODEL_SIZES = {
     "Flux": get_size_by_name("flux"),
     "SD3": get_size_by_name("sd3")
 }
+
+
+# --- Регистрация ноды в ComfyUI ---
+NODE_CLASS_MAPPINGS = {
+    "FluxSDLatentImage": FluxSDLatentImage
+}
+
+NODE_DISPLAY_NAME_MAPPINGS = {
+    "FluxSDLatentImage": "FluxSDLatentImage"
+}
