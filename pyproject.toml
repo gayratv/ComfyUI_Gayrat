@@ -1,6 +1,6 @@
 [project]
-name = "comfyui_custom_nodes_gayrat"
-description = "Nodes:GoogleTranslate, ImageResize"
+name = "comfyui_gayrat"
+description = "набор нод: google translate, Concat Images, Flux/SD Latent Image"
 version = "1.0.2"
 license = { file = "LICENSE" }
 
