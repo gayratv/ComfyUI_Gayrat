@@ -5,9 +5,9 @@ version = "1.0.1"
 license = { file = "LICENSE" }
 
 [project.urls]
-Repository = "https://github.com/gayratv/ComfyUI_Custom_Nodes_Gayrat"
+Repository = "https://github.com/gayratv/ComfyUI_Gayrat"
 
 [tool.comfy]
 PublisherId = "gayrat"
-DisplayName = "ComfyUI_Custom_Nodes_Gayrat"
+DisplayName = "ComfyUI_Gayrat"
 Icon = ""
