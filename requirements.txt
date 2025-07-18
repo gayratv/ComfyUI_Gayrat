@@ -6,3 +6,4 @@ Pillow
 numpy
 torchvision
 blend_modes
+httpx

@@ -7,6 +7,7 @@
 * `max_tokens` фиксирован (2048 ≤ 8192), `top_p` = 0.85 по умолчанию.
 """
 
+from __future__ import annotations
 import base64
 import io
 import logging
