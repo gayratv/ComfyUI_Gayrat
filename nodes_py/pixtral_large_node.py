@@ -5,6 +5,9 @@
 * После получения первого ответа текст переводится на английский тем же API и возвращается вторым выходом.
 * Ключ читается из окружения **MISTRAL_API_KEY**.
 * `max_tokens` фиксирован (2048 ≤ 8192), `top_p` = 0.85 по умолчанию.
+
+код основан на идее
+https://github.com/ShmuelRonen/ComfyUI_pixtral_large/blob/main/pixtral_large_node.py
 """
 
 from __future__ import annotations
@@ -80,7 +83,7 @@ async def _call_mistral(api_key: str, payload: dict) -> dict:
 # Определение ноды
 # -----------------------------------------------------------------------------
 
-class ComfyUIPixtralLarge:
+class ComfyUIPixtralLargeG:
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -162,5 +165,5 @@ class ComfyUIPixtralLarge:
 # Регистрация
 # -----------------------------------------------------------------------------
 
-NODE_CLASS_MAPPINGS = {"ComfyUIPixtralLarge": ComfyUIPixtralLarge}
-NODE_DISPLAY_NAME_MAPPINGS = {"ComfyUIPixtralLarge": "Pixtral Large"}
+NODE_CLASS_MAPPINGS = {"ComfyUIPixtralLargeG": ComfyUIPixtralLargeG}
+NODE_DISPLAY_NAME_MAPPINGS = {"ComfyUIPixtralLargeG": "Pixtral LargeG"}
