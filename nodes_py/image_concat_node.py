@@ -1,134 +1,79 @@
 import torch
-from PIL import Image
 import numpy as np
-import os
-import random
+from PIL import Image, ImageDraw, ImageFont
 import folder_paths
 
 
 class ConcatImages:
     @classmethod
-    def INPUT_TYPES(cls):
+    def INPUT_TYPES(s):
         return {
             "required": {
                 "image1": ("IMAGE",),
-                "background_color": ("COLOR", {"default": "#000000"}),
-                "layout": (["1*1", "1*4", "1*3", "2*2"], {"default": "2*2"}),
             },
             "optional": {
                 "image2": ("IMAGE",),
                 "image3": ("IMAGE",),
                 "image4": ("IMAGE",),
-            },
+                "background_color": ("STRING", {"default": "#000000"}),
+            }
         }
 
     RETURN_TYPES = ("IMAGE",)
-    FUNCTION = "concat"
-    CATEGORY = "Gayrat/image processing"
+    FUNCTION = "concat_images"
+    CATEGORY = "image processing"
 
-    # ---------- helpers ----------
-    @staticmethod
-    def _tensor_to_pil(t):
-        if t.dim() == 4:
-            t = t[0]
-        arr = (t.cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
-        return Image.fromarray(arr)
+    def concat_images(self, image1, image2=None, image3=None, image4=None, background_color="#000000"):
+        # Собираем все поданные изображения в один список
+        images_in = [img for img in [image1, image2, image3, image4] if img is not None]
+        num_images = len(images_in)
 
-    @staticmethod
-    def _pil_to_tensor(img: Image.Image) -> torch.Tensor:
-        t = torch.from_numpy(np.array(img).astype(np.float32) / 255.0)
-        return t.unsqueeze(0)
+        if num_images == 0:
+            # Если изображений нет (хотя image1 обязателен), возвращаем пустой тензор
+            return (torch.zeros(1, 1, 1, 3),)
 
-    @staticmethod
-    def _parse_color(c: str):
-        if isinstance(c, str) and c.startswith("#") and len(c) == 7:
-            try:
-                return tuple(int(c[i : i + 2], 16) for i in (1, 3, 5))
-            except Exception:
-                pass
-        return (0, 0, 0)
+        # Конвертируем тензоры в PIL изображения
+        images_pil = [Image.fromarray((img.squeeze(0).cpu().numpy() * 255).astype(np.uint8)) for img in images_in]
 
-    # ---------- main ----------
-    def concat(
-        self,
-        image1,
-        background_color,
-        layout,
-        image2=None,
-        image3=None,
-        image4=None,
-    ):
-        imgs = [img for img in (image1, image2, image3, image4) if img is not None]
+        # Определяем максимальную ширину и высоту
+        max_w = max(img.width for img in images_pil)
+        max_h = max(img.height for img in images_pil)
 
-        # sanity-checks для разных схем
-        if layout == "1*1" and len(imgs) < 1:
-            raise ValueError("Layout '1*1' требует хотя бы image1")
-        if layout == "1*4" and len(imgs) < 2:
-            raise ValueError("Layout '1*4' требует ≥ 2 изображений")
-        if layout == "1*3" and len(imgs) != 3:
-            raise ValueError("Layout '1*3' требует ровно 3 изображения")
-        if layout == "2*2" and not (2 <= len(imgs) <= 4):
-            raise ValueError("Layout '2*2' требует 2–4 изображений")
+        # --- Новая логика определения макета ---
+        if num_images == 1:
+            # 1 изображение: просто возвращаем его
+            final_image = images_pil[0]
+        elif num_images == 2:
+            # 2 изображения: макет 1x2 (в ряд)
+            final_image = Image.new('RGB', (max_w * 2, max_h), background_color)
+            final_image.paste(images_pil[0], (0, 0))
+            final_image.paste(images_pil[1], (max_w, 0))
+        elif num_images == 3 or num_images == 4:
+            # 3 или 4 изображения: макет 2x2 (сетка)
+            final_image = Image.new('RGB', (max_w * 2, max_h * 2), background_color)
+            final_image.paste(images_pil[0], (0, 0))
+            if num_images > 1:
+                final_image.paste(images_pil[1], (max_w, 0))
+            if num_images > 2:
+                final_image.paste(images_pil[2], (0, max_h))
+            if num_images > 3:
+                final_image.paste(images_pil[3], (max_w, max_h))
 
-        pil_images = [self._tensor_to_pil(i) for i in imgs]
-        bg_color = self._parse_color(background_color)
+        # Конвертируем итоговое изображение обратно в тензор
+        final_tensor = torch.from_numpy(np.array(final_image).astype(np.float32) / 255.0).unsqueeze(0)
 
-        max_w = max(p.width for p in pil_images)
-        max_h = max(p.height for p in pil_images)
+        return (final_tensor,)
 
-        # ---------- компоновка ----------
-        if layout == "1*1":
-            new_im = pil_images[0].copy()
-
-        elif layout == "1*4":
-            count = min(len(pil_images), 4)
-            new_im = Image.new("RGB", (max_w * count, max_h), color=bg_color)
-            for idx in range(count):
-                img, mask = pil_images[idx], None
-                if img.mode in ("RGBA", "LA"):
-                    mask = img
-                new_im.paste(img, (max_w * idx, 0), mask)
-
-        elif layout == "1*3":
-            new_im = Image.new("RGB", (max_w * 3, max_h), color=bg_color)
-            for idx in range(3):
-                img, mask = pil_images[idx], None
-                if img.mode in ("RGBA", "LA"):
-                    mask = img
-                new_im.paste(img, (max_w * idx, 0), mask)
-
-        elif layout == "2*2":
-            if len(pil_images) == 2:
-                new_im = Image.new("RGB", (max_w * 2, max_h), color=bg_color)
-                for idx in range(2):
-                    img, mask = pil_images[idx], None
-                    if img.mode in ("RGBA", "LA"):
-                        mask = img
-                    new_im.paste(img, (max_w * idx, 0), mask)
-            else:
-                new_im = Image.new("RGB", (max_w * 2, max_h * 2), color=bg_color)
-                positions = [(0, 0), (max_w, 0), (0, max_h), (max_w, max_h)]
-                for idx, pos in enumerate(positions[: len(pil_images)]):
-                    img, mask = pil_images[idx], None
-                    if img.mode in ("RGBA", "LA"):
-                        mask = img
-                    new_im.paste(img, pos, mask)
-        else:
-            raise ValueError("Неизвестное значение layout")
-
-        # ---------- вывод ----------
-        tensor = self._pil_to_tensor(new_im)
-
-        # превью (как PreviewImage)
-        temp_dir = folder_paths.get_temp_directory()
-        os.makedirs(temp_dir, exist_ok=True)
-        filename = f"concat_{random.randint(0, 99999999):08d}.png"
-        new_im.save(os.path.join(temp_dir, filename))
-
-        ui = {"images": [{"filename": filename, "subfolder": "", "type": "temp"}]}
-
-        return (tensor, {"ui": ui})
+    @classmethod
+    def IS_CHANGED(s, **kwargs):
+        # Простая проверка на изменение для перезапуска
+        return float("NaN")
 
 
-NODE_CLASS_MAPPINGS = {"ConcatImages": ConcatImages}
-NODE_DISPLAY_NAME_MAPPINGS = {"ConcatImages": "Concat Images"}
+NODE_CLASS_MAPPINGS = {
+    "ConcatImages": ConcatImages
+}
+
+NODE_DISPLAY_NAME_MAPPINGS = {
+    "ConcatImages": "Concat Images Logic"
+}
