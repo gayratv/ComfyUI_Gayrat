@@ -1,7 +1,7 @@
 # ──────────────────────────────────────────────────────────────────────────────
 #  FluxSamplerParams  – модифицированная версия
 #  • Поддерживает кастомные планировщики (например, OptimalStepsScheduler)
-#  • Для имени planировщика "optimal"/"optimal_steps"/"optimalsteps" вызывает
+#  • Для имени плaнировщика "optimal"/"optimal_steps"/"optimalsteps" вызывает
 #    узел OptimalStepsScheduler, которому передаётся model_type="FLUX".
 #  • В остальных случаях использует comfy.samplers.calculate_sigmas, как прежде
 # ──────────────────────────────────────────────────────────────────────────────
@@ -145,9 +145,10 @@ class SchedulerSelectHelper:
         Ensures 'OptimalStepsScheduler' is always present in the output.
         """
         selected = [name for name, val in values.items() if val]
+        #  Убрал добавление
         # Always include OptimalStepsScheduler
-        if "OptimalStepsScheduler" not in selected:
-            selected.append("OptimalStepsScheduler")
+        # if "OptimalStepsScheduler" not in selected:
+        #     selected.append("OptimalStepsScheduler")
 
 
         return (", ".join(selected),)
@@ -198,7 +199,10 @@ class FluxSamplerParams:
                 "model": ("MODEL",),
                 "conditioning": ("CONDITIONING",),
                 "latent_image": ("LATENT",),
-                "seed": ("STRING", {"default": "?"}),
+                # "seed": ("STRING", {"default": "?"}),
+                # ИЗМЕНЕНИЕ: Тип поля изменен на STRING с multiline, и добавлена подсказка в default
+                "seed": ("STRING",
+                         {"default": "123, ?, 456\n# Список сидов через запятую. '?' - случайный.", "multiline": True}),
                 "sampler": ("STRING", {"default": "euler"}),
                 "scheduler": ("STRING", {"default": "simple"}),
                 "steps": ("STRING", {"default": "20"}),
@@ -233,8 +237,23 @@ class FluxSamplerParams:
         denoise,
         loras=None,
     ):
-        is_flow = model.model.model_type == comfy.model_base.ModelType.FLOW
-        is_schnell = model.model.model_type == comfy.model_base.ModelType.FLOW
+        is_flow = model.model.model_type    == comfy.model_base.ModelType.FLOW
+        is_flux_model = model.model.model_type == comfy.model_base.ModelType.FLUX
+
+        # Переменная для хранения результата
+        is_schnell_model = False
+
+        # 1. Сначала проверяем, что это в принципе модель типа FLUX
+        if model.model.model_type == comfy.model_base.ModelType.FLUX:
+            # 2. Затем проверяем, что у модели есть конфигурация и имя
+            #    Это безопасный способ избежать ошибок, если атрибута нет
+            if hasattr(model, 'model_config') and hasattr(model.model_config, 'name'):
+                # 3. Приводим имя к нижнему регистру и ищем подстроку "schnell"
+                if 'schnell' in model.model_config.name.lower():
+                    is_schnell_model = True
+
+        # Теперь переменная is_schnell_model будет True только для моделей
+        # типа FLUX, в названии которых есть "schnell", например, "FLUX.1-schnell.safetensors"
 
         # сиды
         noise_seeds = [
@@ -270,6 +289,9 @@ class FluxSamplerParams:
         # else:
         #     max_shift = "0"
         #     base_shift = "1.0" if base_shift == "" else base_shift
+        if is_schnell_model:
+          max_shift = "0"
+          base_shift = "1.0"
 
         base_shift_list = parse_string_to_list(base_shift)
 
@@ -329,11 +351,10 @@ class FluxSamplerParams:
 
                     for ms in max_shift_list:
                         for bs in base_shift_list:
-                            work_model = (
-                                modelsampling.patch_aura(patched_model, bs)[0]
-                                if is_flow else
-                                modelsampling.patch(patched_model, ms, bs, width, height)[0]
-                            )
+                            if is_flow:
+                                work_model = modelsampling.patch_aura(patched_model, bs)[0]
+                            else:
+                                work_model = modelsampling.patch(patched_model, ms, bs, width, height)[0]
 
                             for g in guidance_list:
                                 cond_val = conditioning_set_values(cond, {"guidance": g})
