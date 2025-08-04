@@ -154,7 +154,8 @@ class SdxlSamplerParams:
         return {
             "required": {
                 "model": ("MODEL",),
-                "conditioning": ("CONDITIONING",),
+                "positive": ("CONDITIONING",),
+                "negative": ("CONDITIONING",),
                 "latent_image": ("LATENT",),
                 # "seed": ("STRING", {"default": "?"}),
                 # ИЗМЕНЕНИЕ: Тип поля изменен на STRING с multiline, и добавлена подсказка в default
@@ -182,7 +183,8 @@ class SdxlSamplerParams:
     def execute(
         self,
         model,
-        conditioning,
+        positive,
+        negative,
         latent_image,
         seed,
         sampler,
@@ -253,12 +255,15 @@ class SdxlSamplerParams:
         base_shift_list = parse_string_to_list(base_shift)
 
         # conditioning
-        if isinstance(conditioning, dict) and "encoded" in conditioning:
-            cond_texts = conditioning["text"]
-            cond_enc   = conditioning["encoded"]
+        positive_cond = positive
+        negative_cond = negative
+
+        if isinstance(positive, dict) and "encoded" in positive:
+            cond_texts = positive["text"]
+            positive_cond   = positive["encoded"]
         else:
             cond_texts = [None]
-            cond_enc   = [conditioning]
+            positive_cond   = [positive]
 
         # подготовка хелперов
         basicguider  = BasicGuider()
@@ -278,7 +283,7 @@ class SdxlSamplerParams:
 
         # прогресс-бар
         total = (
-            len(cond_enc) * len(noise_seeds) * len(max_shift_list) * len(base_shift_list)
+            len(positive_cond) * len(noise_seeds) * len(max_shift_list) * len(base_shift_list)
             * len(guidance_list) * len(sampler_list) * len(scheduler_list)
             * len(steps_list) * len(denoise_list) * lora_strength_len
         )
@@ -300,7 +305,7 @@ class SdxlSamplerParams:
                 )[0] if loras else model
             )
 
-            for c_idx, cond in enumerate(cond_enc):
+            for c_idx, cond in enumerate(positive_cond):
                 prompt = cond_texts[c_idx] if cond_texts[0] else None
 
                 for seed_val in noise_seeds:
@@ -314,8 +319,9 @@ class SdxlSamplerParams:
                                 work_model = modelsampling.patch(patched_model, ms, bs, width, height)[0]
 
                             for g in guidance_list:
-                                cond_val = conditioning_set_values(cond, {"guidance": g})
-                                guider = basicguider.get_guider(work_model, cond_val)[0]
+                                positive_with_guidance = conditioning_set_values(positive_cond, {"guidance": g})
+                                # guider = basicguider.get_guider(work_model, positive_with_guidance, negative_cond)[0]
+                                guider = basicguider.get_guider(work_model, positive_with_guidance, negative_cond)[0]
 
                                 for samp in sampler_list:
                                     samp_obj = comfy.samplers.sampler_object(samp)
