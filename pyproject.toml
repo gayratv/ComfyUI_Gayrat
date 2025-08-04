@@ -1,7 +1,7 @@
 [project]
 name = "comfyui_gayrat"
 description = "набор нод: google translate, Concat Images, Flux/SD Latent Image"
-version = "1.0.9"
+version = "1.0.10"
 license = { file = "LICENSE" }
 
 [project.urls]
