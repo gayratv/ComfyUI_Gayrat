@@ -237,7 +237,8 @@ class SdxlSamplerParams:
                                             scheduler=sched,
                                             denoise=dn,
                                             positive=pos_cond,
-                                            negative=negative[0],
+                                            # negative=negative[0],
+                                            negative=negative,
                                             latent_image=latent_image
                                         )[0]
                                         elapsed = time.time() - t0
@@ -253,6 +254,8 @@ class SdxlSamplerParams:
                                             "guidance": g,
                                             "denoise": dn,
                                             "prompt": prompt,
+                                            "max_shift":1.0,
+                                            "base_shift":1.0,
                                             **({"lora": lora_models[0],
                                                 "lora_strength": lora_strengths[0][l_idx]} if loras else {})
                                         })

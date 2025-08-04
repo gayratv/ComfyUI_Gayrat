@@ -1,5 +1,8 @@
 #!/bin/bash
 
+set -e
+#set -x
+
 # ==== Настройки ====
 SRC_DIR="/mnt/f/_prg/python/ComfyUI_Gayrat"
 CONTAINER_NAME="comfyui-union2"
@@ -17,15 +20,21 @@ EXCLUDE_OPTS=(
 )
 
 # ==== Очистка старых временных данных ====
-if [ -d "$TMP_DIR" ]; then
-  rm -rf "$TMP_DIR"
-fi
+#if [ -d "$TMP_DIR" ]; then
+#  rm -rf "$TMP_DIR"
+#fi
 
+rm -rf "$TMP_DIR"
 mkdir -p "$TMP_DIR"
+ls "$TMP_DIR"
 
 # ==== Копируем с исключениями ====
 echo "🔍 Копирую файлы локально с исключениями..."
-rsync -av "${EXCLUDE_OPTS[@]}" "$SRC_DIR/" "$TMP_DIR/"
+#rsync -av "${EXCLUDE_OPTS[@]}" "$SRC_DIR/" "$TMP_DIR/"
+#rsync -rv "${EXCLUDE_OPTS[@]}" "$SRC_DIR/" "$TMP_DIR/"
+
+# Переходим в исходный каталог, чтобы обойти ошибку getcwd()
+(cd "$SRC_DIR" && rsync -rv "${EXCLUDE_OPTS[@]}" ./ "$TMP_DIR/")
 
 # ==== Копируем в контейнер ====
 echo "🐋 Копирую файлы в контейнер $CONTAINER_NAME..."
