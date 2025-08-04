@@ -1,5 +1,6 @@
 # ──────────────────────────────────────────────────────────────────────────────
 #  SdxlSamplerParams  – модифицированная версия для SDXL и SD1.5
+#  • Использует стандартный KSampler
 # ──────────────────────────────────────────────────────────────────────────────
 import os
 
@@ -11,39 +12,9 @@ import torch
 import comfy.model_base
 import comfy.samplers
 
-from comfy_extras.nodes_custom_sampler import Noise_RandomNoise, BasicGuider, SamplerCustomAdvanced
+from nodes import KSampler, LoraLoader
 from comfy_extras.nodes_latent import LatentBatch
-# from comfy_extras.nodes_model_advanced import ModelSamplingFlux, ModelSamplingAuraFlow
-# from node_helpers import conditioning_set_values, parse_string_to_list
-from nodes import LoraLoader
 from comfy.utils import ProgressBar
-
-# # ──   узлы/утилиты, которые уже есть в ComfyUI  ───────────────────────────────
-# from nodes import (
-#     # BasicGuider,
-#     SamplerCustomAdvanced,
-#     LatentBatch,
-#     ModelSamplingFlux,
-#     ModelSamplingAuraFlow,
-#     Noise_RandomNoise,
-#     ProgressBar,
-#     OptimalStepsScheduler,       # ← наш «особый» узел
-#     LoraLoader,
-# )
-#
-# from utils import (
-#     parse_string_to_list,
-#     conditioning_set_values,
-# )
-
-
-import torch.nn.functional as F
-
-import torchvision.transforms.v2 as T
-
-# import torchvision
-# T = torchvision.transforms.v2
-
 
 # путь к папке проекта (родитель папки Samplers)
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -114,24 +85,6 @@ class SdxlSamplerParams:
     Перебор семплеров/планировщиков/сидов и пр. для генерации латент-изображений
     """
 
-    # ── статический расчёт сигм ──────────────────────────────────────────────
-    @staticmethod
-    def _get_sigmas(model, scheduler: str, steps: int, denoise: float):
-        """
-        Возвращает torch.FloatTensor длиной steps+1
-        """
-        total_steps = steps
-        if denoise < 1.0:
-            if denoise <= 0.0:
-                return torch.FloatTensor([])
-            total_steps = int(steps / denoise)
-
-        sigmas = comfy.samplers.calculate_sigmas(
-            model.get_model_object("model_sampling"), scheduler, total_steps
-        ).cpu()
-
-        return sigmas[-(steps + 1):]
-
     # ── инициализация ────────────────────────────────────────────────────────
     def __init__(self):
         self.loraloader = None
@@ -159,8 +112,8 @@ class SdxlSamplerParams:
             },
         }
 
-    RETURN_TYPES = ("LATENT", "SAMPLER_PARAMS", "SIGMAS")
-    RETURN_NAMES = ("latent", "params", "sigmas")
+    RETURN_TYPES = ("LATENT", "SAMPLER_PARAMS")
+    RETURN_NAMES = ("latent", "params")
     FUNCTION = "execute"
     CATEGORY = "Gayrat/sampling"
 
@@ -179,9 +132,6 @@ class SdxlSamplerParams:
             denoise,
             loras=None,
     ):
-        # Определение типа модели (SDXL/SD1.5)
-        # Убрана логика для FLUX, поскольку она больше не нужна
-        is_flow = model.model.model_type == comfy.model_base.ModelType.FLOW
 
         # сиды
         noise_seeds = [
@@ -208,7 +158,7 @@ class SdxlSamplerParams:
         # числовые списки
         steps_list = parse_string_to_list(steps or "20")
         denoise_list = parse_string_to_list(denoise or "1.0")
-        guidance_list = parse_string_to_list(guidance or "3.5")
+        guidance_list = parse_string_to_list(guidance or "7.0")
 
         # conditioning
         positive_cond = positive
@@ -222,10 +172,9 @@ class SdxlSamplerParams:
             positive_cond = [positive]
 
         # подготовка хелперов
-        basicguider = BasicGuider()
-        sampler_adv = SamplerCustomAdvanced()
+        sampler_node = KSampler()
         latentbatch = LatentBatch()
-        # Для SDXL и SD1.5 используется стандартный ModelSampling, патчи не требуются
+
         width = latent_image["samples"].shape[3] * 8
         height = latent_image["samples"].shape[2] * 8
 
@@ -248,7 +197,6 @@ class SdxlSamplerParams:
         # выходы
         out_latent = None
         out_params = []
-        out_sigmas = None
         counter = 0
 
         # ──────────────────────────────────────────────────────────────────────
@@ -261,26 +209,15 @@ class SdxlSamplerParams:
                 )[0] if loras else model
             )
 
-            for c_idx, cond in enumerate(positive_cond):
+            for c_idx, pos_cond in enumerate(positive_cond):
                 prompt = cond_texts[c_idx] if cond_texts[0] else None
 
                 for seed_val in noise_seeds:
-                    noise_node = Noise_RandomNoise(seed_val)
-
-                    # Убрана логика перебора max_shift и base_shift
-
                     for g in guidance_list:
-                        positive_with_guidance = conditioning_set_values(positive_cond, {"guidance": g})
-                        guider = basicguider.get_guider(patched_model, positive_with_guidance, negative_cond)[0]
-
                         for samp in sampler_list:
-                            samp_obj = comfy.samplers.sampler_object(samp)
-
                             for sched in scheduler_list:
                                 for st in steps_list:
                                     for dn in denoise_list:
-                                        sigmas = self._get_sigmas(patched_model, sched, st, dn)
-                                        out_sigmas = sigmas
 
                                         counter += 1
                                         logging.info(
@@ -294,9 +231,18 @@ class SdxlSamplerParams:
                                         )
 
                                         t0 = time.time()
-                                        latent = sampler_adv.sample(
-                                            noise_node, guider, samp_obj, sigmas, latent_image
-                                        )[1]
+                                        latent = sampler_node.sample(
+                                            model=patched_model,
+                                            seed=seed_val,
+                                            steps=st,
+                                            cfg=g,
+                                            sampler_name=samp,
+                                            scheduler=sched,
+                                            denoise=dn,
+                                            positive=pos_cond,
+                                            negative=negative[0],  # Assuming negative is a list with one item
+                                            latent_image=latent_image
+                                        )[0]
                                         elapsed = time.time() - t0
 
                                         out_params.append({
@@ -322,7 +268,8 @@ class SdxlSamplerParams:
                                         if pbar:
                                             pbar.update(1)
 
-        return out_latent, out_params, out_sigmas
+        # Обратите внимание, что мы больше не возвращаем 'sigmas'
+        return out_latent, out_params
 
 
 # Register node classes
