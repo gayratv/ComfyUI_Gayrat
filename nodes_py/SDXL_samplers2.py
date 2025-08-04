@@ -161,15 +161,12 @@ class SdxlSamplerParams:
         guidance_list = parse_string_to_list(guidance or "7.0")
 
         # conditioning
-        positive_cond = positive
-        negative_cond = negative
-
         if isinstance(positive, dict) and "encoded" in positive:
             cond_texts = positive["text"]
-            positive_cond = positive["encoded"]
+            positive_list = positive["encoded"]
         else:
             cond_texts = [None]
-            positive_cond = [positive]
+            positive_list = [positive]
 
         # подготовка хелперов
         sampler_node = KSampler()
@@ -188,7 +185,7 @@ class SdxlSamplerParams:
 
         # прогресс-бар
         total = (
-                len(positive_cond) * len(noise_seeds)
+                len(positive_list) * len(noise_seeds)
                 * len(guidance_list) * len(sampler_list) * len(scheduler_list)
                 * len(steps_list) * len(denoise_list) * lora_strength_len
         )
@@ -209,7 +206,7 @@ class SdxlSamplerParams:
                 )[0] if loras else model
             )
 
-            for c_idx, pos_cond in enumerate(positive_cond):
+            for c_idx, pos_cond in enumerate(positive_list):
                 prompt = cond_texts[c_idx] if cond_texts[0] else None
 
                 for seed_val in noise_seeds:
@@ -240,7 +237,7 @@ class SdxlSamplerParams:
                                             scheduler=sched,
                                             denoise=dn,
                                             positive=pos_cond,
-                                            negative=negative[0],  # Assuming negative is a list with one item
+                                            negative=negative[0],
                                             latent_image=latent_image
                                         )[0]
                                         elapsed = time.time() - t0
