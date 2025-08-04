@@ -151,7 +151,7 @@ class SdxlSamplerParams:
                 "sampler": ("STRING", {"default": "euler"}),
                 "scheduler": ("STRING", {"default": "simple"}),
                 "steps": ("STRING", {"default": "20"}),
-                "guidance": ("STRING", {"default": "3.5"}),
+                "guidance": ("STRING", {"default": "7.0"}),
                 "denoise": ("STRING", {"default": "1.0"}),
             },
             "optional": {
