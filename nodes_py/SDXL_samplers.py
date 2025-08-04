@@ -1,32 +1,28 @@
-"""
-Файл - копия K-sampler для перебора samplers
+# sdxl_sampler_params.py
+# ------------------------------------------------------------
+# ComfyUI custom node — **SdxlSamplerParams**
+# Parameter sweeper designed for Stable Diffusion XL (also works with SD 1.5).
+# Iterates over seeds, samplers, schedulers, steps, guidance‑scale and
+# denoise, supports positive & negative conditioning and optional LoRA patches.
+# Requires the *comfy_extras* package.
+# ------------------------------------------------------------
+# Place this file in `ComfyUI/custom_nodes` and restart ComfyUI.
 
-diffusion_sampler_params.py
-
-ComfyUI custom node “DiffusionSamplerParams”
-
-Iterates over seeds, samplers, schedulers, steps, guidance‑scale and denoise
-values to generate batches of latents for *diffusion* models (SD 1.5, SDXL).
-
-Inspired by FluxSamplerParams but streamlined: no max/base shift logic,
-no FLUX / FLOW patching – it works directly with ModelType.DIFFUSION.
-
-Place this file in your ComfyUI `custom_nodes` folder.
-"""
+from __future__ import annotations
 
 import logging
 import random
 import time
-from typing import List, Dict, Any
-
-import torch
-import torch.nn.functional as F
+from copy import deepcopy
+from typing import Any, Dict, List
 
 import comfy.samplers
 import comfy.model_base
 from comfy.utils import ProgressBar
 
-# Optional extras (present in comfy_extras); we fall back gracefully
+# -----------------------------------------------------------------------------
+# comfy_extras imports (mandatory)
+# -----------------------------------------------------------------------------
 try:
     from comfy_extras.nodes_custom_sampler import (
         Noise_RandomNoise,
@@ -36,148 +32,122 @@ try:
     from comfy_extras.nodes_latent import LatentBatch
 except ImportError as e:  # pragma: no cover
     raise ImportError(
-        "DiffusionSamplerParams requires the comfy_extras package "
-        "(`pip install comfy_extras`)."
+        "SdxlSamplerParams requires the *comfy_extras* package.\n"
+        "Install it with:  pip install comfy_extras"
     ) from e
 
+# -----------------------------------------------------------------------------
+# Optional LoRA loader (also from comfy_extras)
+# -----------------------------------------------------------------------------
 try:
     from nodes import LoraLoader
-except ImportError:
-    # If comfy_extras is available LoraLoader will be there; otherwise stub.
+except ImportError:  # pragma: no cover
     class LoraLoader:  # type: ignore
-        def load_lora(self, *args, **kwargs):
+        def load_lora(self, *_, **__):
             raise RuntimeError("LoRA support unavailable – install comfy_extras.")
 
+# -----------------------------------------------------------------------------
+# Helper utilities
+# -----------------------------------------------------------------------------
 
-# ────────────────────────────────────────────────────────────────────────────
-# Helpers
-# ────────────────────────────────────────────────────────────────────────────
-def parse_string_to_list(s: str) -> List[float | int]:
-    """
-    Parses a flexible numeric list specification.
+def _parse_numeric_list(spec: str) -> List[float | int]:
+    """Parse flexible numeric list specifications: '30', '1,2,3', '4...10+2'."""
+    spec = spec.strip()
+    if spec == "":
+        return []
 
-    Examples
-    --------
-    ``"1, 2, 3"`` → [1, 2, 3]
-    ``"4...10+2"`` → [4, 6, 8, 10]
+    def _to_number(tok: str) -> float | int:
+        return float(tok) if "." in tok else int(tok)
 
-    Returns ints when possible, floats otherwise.
-    """
-    elements = s.split(",")
-    result: List[float | int] = []
-
-    def _parse_number(token: str) -> float | int:
-        try:
-            return float(token) if "." in token else int(token)
-        except ValueError:
-            return 0
-
-    def _decimal_places(token: str) -> int:
-        return len(token.split(".")[1]) if "." in token else 0
-
-    for elem in elements:
-        elem = elem.strip()
-        if "..." in elem:  # range syntax  start...end+step
-            start, rest = elem.split("...")
-            end, step = rest.split("+")
-            decimals = _decimal_places(step)
-            start_n, end_n, step_n = map(_parse_number, (start, end, step))
-            # direction agnostic
-            if (start_n > end_n and step_n > 0) or (start_n < end_n and step_n < 0):
-                step_n = -step_n
-            current = start_n
-            while current <= end_n if step_n > 0 else current >= end_n:
-                result.append(round(current, decimals))
-                current += step_n
+    vals: List[float | int] = []
+    for part in spec.replace("\n", ",").split(","):
+        part = part.strip()
+        if part == "":
+            continue
+        if "..." in part:  # range syntax
+            start_s, rest = part.split("...")
+            end_s, step_s = rest.split("+")
+            start, end, step = map(_to_number, (start_s, end_s, step_s))
+            if (start < end and step <= 0) or (start > end and step >= 0):
+                step = -step
+            x = start
+            while (x <= end) if step > 0 else (x >= end):
+                vals.append(x)
+                x += step
         else:
-            value = _parse_number(elem)
-            if isinstance(value, float):
-                value = round(value, _decimal_places(elem))
-            result.append(value)
-    return result
+            vals.append(_to_number(part))
+    return vals or [_to_number(spec)]
 
+
+def _make_empty_negative(pos_cond):
+    """Create unconditional stub conditioning with the same *structure* as positive."""
+    try:
+        stub = deepcopy(pos_cond)
+        # If list of [text, extra] pairs – zero weights & texts
+        if isinstance(stub, list):
+            for item in stub:
+                if isinstance(item, list) and len(item) == 2:
+                    item[0] = ""
+                    if isinstance(item[1], dict):
+                        item[1]["weight"] = 0.0
+        # CLIPConditioningData (SDXL) supports .multiply
+        elif hasattr(stub, "multiply"):
+            stub = stub.multiply(0.0)
+        return stub
+    except Exception:
+        pass
+    return pos_cond  # fallback same object
+
+# -----------------------------------------------------------------------------
+# Node class implementation
+# -----------------------------------------------------------------------------
 
 class SdxlSamplerParams:
-    """
-    Parameter sweeper for ComfyUI diffusion models (SD 1.5, SDXL).
+    """Parameter sweeper node for SDXL & SD 1.5 models."""
 
-    Returns
-    -------
-    LATENT : torch.Tensor
-        Batched latent samples (B, C, H/8, W/8).
-    SAMPLER_PARAMS : List[Dict[str, Any]]
-        Parameter dictionary for each sample.
-    SIGMAS : torch.FloatTensor
-        Sigma schedule used for the *last* sample (steps + 1 values).
-    """
+    CATEGORY = "Gayrat/sampling"
+    RETURN_TYPES = ("LATENT", "SAMPLER_PARAMS", "SIGMAS")
+    RETURN_NAMES = ("latent", "params", "sigmas")
+    FUNCTION = "execute"
 
-    # ────────────────────────────────────────────────────────────────────
-    # Static helpers
-    # ────────────────────────────────────────────────────────────────────
-    @staticmethod
-    def _get_sigmas(
-        model,
-        scheduler: str,
-        steps: int,
-        denoise: float,
-    ) -> torch.FloatTensor:
-        """
-        Compute a sigma schedule identical to KSampler behaviour.
-        """
-        total_steps = steps
-        if denoise < 1.0:
-            if denoise <= 0.0:
-                return torch.FloatTensor([])
-            total_steps = int(steps / denoise)
-
-        sigmas = comfy.samplers.calculate_sigmas(
-            model.get_model_object("model_sampling"), scheduler, total_steps
-        ).cpu()
-        return sigmas[-(steps + 1) :]
-
-    # ────────────────────────────────────────────────────────────────────
-    # ComfyUI node interface
-    # ────────────────────────────────────────────────────────────────────
+    # ---------------------- ComfyUI INPUT_TYPES
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
                 "model": ("MODEL",),
-                "conditioning": ("CONDITIONING",),
+                "positive": ("CONDITIONING",),
+                "negative": ("CONDITIONING",),
                 "latent_image": ("LATENT",),
-                "seed": (
-                    "STRING",
-                    {
-                        "default": "?, 123, 456\n# Comma‑separated list. '?' – random.",
-                        "multiline": True,
-                    },
-                ),
+                "seed": ("STRING", {"default": "?", "multiline": True}),
                 "sampler": ("STRING", {"default": "euler"}),
                 "scheduler": ("STRING", {"default": "simple"}),
-                "steps": ("STRING", {"default": "20"}),
+                "steps": ("STRING", {"default": "30"}),
                 "guidance": ("STRING", {"default": "7.0"}),
                 "denoise": ("STRING", {"default": "1.0"}),
             },
-            "optional": {
-                "loras": ("LORA_PARAMS",),
-            },
+            "optional": {"loras": ("LORA_PARAMS",)},
         }
 
-    RETURN_TYPES = ("LATENT", "SAMPLER_PARAMS", "SIGMAS")
-    RETURN_NAMES = ("latent", "params", "sigmas")
-    FUNCTION = "execute"
-    CATEGORY = "Gayrat/sampling"
+    # ---------------------- sigma schedule helper
+    @staticmethod
+    def _sigmas(model, scheduler: str, steps: int, denoise: float):
+        total = steps if denoise == 1 else int(steps / denoise)
+        sigmas = comfy.samplers.calculate_sigmas(
+            model.get_model_object("model_sampling"), scheduler, total
+        ).cpu()
+        return sigmas[-(steps + 1) :]
 
-    # ────────────────────────────────────────────────────────────────────
-    # Core execution
-    # ────────────────────────────────────────────────────────────────────
+    # ---------------------- init
     def __init__(self):
-        self.loraloader: LoraLoader | None = None
+        self._loraloader: LoraLoader | None = None
 
+    # ---------------------- main execute logic
     def execute(
         self,
         model,
-        conditioning,
+        positive,
+        negative,
         latent_image,
         seed: str,
         sampler: str,
@@ -187,182 +157,147 @@ class SdxlSamplerParams:
         denoise: str,
         loras=None,
     ):
-        if model.model.model_type != comfy.model_base.ModelType.DIFFUSION:
-            raise ValueError("DiffusionSamplerParams requires a DIFFUSION model.")
+        # -- Model type check (skip on older builds)
+        try:
+            if model.model.model_type != comfy.model_base.ModelType.DIFFUSION:
+                raise ValueError("Only diffusion models (SDXL / SD1.5) supported.")
+        except AttributeError:
+            pass  # enum missing in old versions – ignore
 
-        # Seeds ────────────────────────────────────────────────────────
-        noise_seeds = [
-            random.randint(0, 999_999) if "?" in n else int(n)
-            for n in seed.replace("\n", ",").split(",")
-            if n.strip()
-        ] or [random.randint(0, 999_999)]
+        # -- Ensure negative conditioning exists
+        if negative is None:
+            logging.info("Negative conditioning missing – using empty stub.")
+            negative = _make_empty_negative(positive)
 
-        # Samplers ─────────────────────────────────────────────────────
-        if sampler.strip() == "*":
-            sampler_list = comfy.samplers.KSampler.SAMPLERS
-        elif sampler.strip().startswith("!"):
-            excluded = {s.strip("! ") for s in sampler.replace("\n", ",").split(",")}
-            sampler_list = [s for s in comfy.samplers.KSampler.SAMPLERS if s not in excluded]
+        # -- Build iteration lists
+        seed_vals = [
+            random.randint(0, 2**32 - 1) if "?" in s else int(s)
+            for s in seed.replace("\n", ",").split(",")
+            if s.strip()
+        ] or [random.randint(0, 2**32 - 1)]
+
+        all_samplers = comfy.samplers.KSampler.SAMPLERS
+        sampler = sampler.strip()
+        if sampler == "*":
+            sampler_vals = all_samplers
+        elif sampler.startswith("!"):
+            excl = {x.strip().lstrip("!") for x in sampler.split(",")}
+            sampler_vals = [s for s in all_samplers if s not in excl]
         else:
-            sampler_list = [
-                s.strip()
-                for s in sampler.replace("\n", ",").split(",")
-                if s.strip() in comfy.samplers.KSampler.SAMPLERS
-            ] or ["euler"]
+            sampler_vals = [s.strip() for s in sampler.split(",") if s.strip()] or ["euler"]
 
-        # Schedulers (we allow any custom string) ──────────────────────
-        scheduler_list = [s.strip() for s in scheduler.replace("\n", ",").split(",")] or ["simple"]
+        sched_vals = [s.strip() for s in scheduler.split(",") if s.strip()] or ["simple"]
+        steps_vals = _parse_numeric_list(steps)
+        guide_vals = _parse_numeric_list(guidance)
+        dn_vals = _parse_numeric_list(denoise)
 
-        # Numeric lists ────────────────────────────────────────────────
-        steps_list = parse_string_to_list(steps or "20")
-        guidance_list = parse_string_to_list(guidance or "7.0")
-        denoise_list = parse_string_to_list(denoise or "1.0")
-
-        # Conditioning (batch‑compatible) ──────────────────────────────
-        if isinstance(conditioning, dict) and "encoded" in conditioning:
-            cond_texts = conditioning["text"]
-            cond_enc = conditioning["encoded"]
-        else:
-            cond_texts = [None]
-            cond_enc = [conditioning]
-
-        # LoRA setup ───────────────────────────────────────────────────
-        lora_strength_len = 1
+        # -- LoRA handling
         if loras:
+            self._loraloader = self._loraloader or LoraLoader()
             lora_models = loras["loras"]
             lora_strengths = loras["strengths"]
-            lora_strength_len = sum(len(lst) for lst in lora_strengths)
-            self.loraloader = self.loraloader or LoraLoader()
+            lora_total = sum(len(lst) for lst in lora_strengths)
+        else:
+            lora_total = 1
 
-        # Helpers ──────────────────────────────────────────────────────
-        basicguider = BasicGuider()
+        # -- Helpers
+        guider_factory = BasicGuider()
         sampler_adv = SamplerCustomAdvanced()
-        latentbatch = LatentBatch()
+        latent_batcher = LatentBatch()
 
-        width = latent_image["samples"].shape[3] * 8
-        height = latent_image["samples"].shape[2] * 8
-
-        # Progress bar ─────────────────────────────────────────────────
+        # -- Progress bar
         total = (
-            len(cond_enc)
-            * len(noise_seeds)
-            * len(guidance_list)
-            * len(sampler_list)
-            * len(scheduler_list)
-            * len(steps_list)
-            * len(denoise_list)
-            * lora_strength_len
+            len(seed_vals)
+            * len(sampler_vals)
+            * len(sched_vals)
+            * len(steps_vals)
+            * len(guide_vals)
+            * len(dn_vals)
+            * lora_total
         )
         pbar = ProgressBar(total) if total > 1 else None
 
-        # Outputs ──────────────────────────────────────────────────────
-        out_latent = None
-        out_params: List[Dict[str, Any]] = []
-        out_sigmas = None
-        counter = 0
+        latents_batched = None
+        params_log: List[Dict[str, Any]] = []
+        last_sigmas = None
 
-        # Sweep all combinations ───────────────────────────────────────
-        for l_idx in range(lora_strength_len):
-            patched_model = (
-                self.loraloader.load_lora(
+        # -- Nested sweep
+        for l_idx in range(lora_total):
+            current_model = model
+            if loras:
+                current_model, _ = self._loraloader.load_lora(
                     model, None, lora_models[0], lora_strengths[0][l_idx], 0
-                )[0]
-                if loras
-                else model
-            )
+                )
 
-            for c_idx, cond in enumerate(cond_enc):
-                prompt = cond_texts[c_idx] if cond_texts[0] else None
+            for s in seed_vals:
+                noise_node = Noise_RandomNoise(s)
 
-                for seed_val in noise_seeds:
-                    noise_node = Noise_RandomNoise(seed_val)
+                for cfg in guide_vals:
+                                        # --- DEBUG: log incoming conditioning types
+                    logging.warning(
+                        "[SdxlSamplerParams] positive type=%s | negative type=%s",
+                        type(positive),
+                        type(negative),
+                    )
+                    # If mistakenly passed raw text, wrap into simple conditioning stub
+                    if isinstance(positive, str):
+                        logging.error("positive came as str – wrapping into stub conditioning!")
+                        positive = [[positive, {"weight": 1.0}]]
+                    if isinstance(negative, str):
+                        logging.error("negative came as str – wrapping into stub conditioning!")
+                        negative = [[negative, {"weight": 0.0}]]
+                    cond_dict = {
+                        "positive": positive,
+                        "negative": negative,
+                        "cond_scale": cfg,
+                    }
+                    guider = guider_factory.get_guider(current_model, cond_dict)[0]
 
-                    for guidance_val in guidance_list:
-                        cond_val = [
-                            t if isinstance(t, list) else t.copy()
-                            for t in cond
-                        ] if isinstance(cond, list) else cond
-                        # Inject guidance into conditioning dict
-                        cond_val = [
-                            [t[0], {**t[1], "guidance": guidance_val}] for t in cond_val
-                        ] if isinstance(cond_val, list) else cond_val
+                    for samp_name in sampler_vals:
+                        samp_obj = comfy.samplers.sampler_object(samp_name)
 
-                        guider = basicguider.get_guider(patched_model, cond_val)[0]
+                        for sched_name in sched_vals:
+                            for st in steps_vals:
+                                for dn in dn_vals:
+                                    sigmas = self._sigmas(current_model, sched_name, int(st), float(dn))
+                                    last_sigmas = sigmas
 
-                        for samp in sampler_list:
-                            samp_obj = comfy.samplers.sampler_object(samp)
+                                    t0 = time.time()
+                                    latent = sampler_adv.sample(
+                                        noise_node, guider, samp_obj, sigmas, latent_image
+                                    )[1]
+                                    elapsed = time.time() - t0
 
-                            for sched in scheduler_list:
-                                for st in steps_list:
-                                    for dn in denoise_list:
-                                        sigmas = self._get_sigmas(patched_model, sched, st, dn)
-                                        out_sigmas = sigmas
-
-                                        counter += 1
-                                        logging.info(
-                                            "Sample %d/%d | seed=%s sampler=%s "
-                                            "scheduler=%s steps=%s guidance=%s denoise=%s%s",
-                                            counter,
-                                            total,
-                                            seed_val,
-                                            samp,
-                                            sched,
-                                            st,
-                                            guidance_val,
-                                            dn,
-                                            f" lora={lora_models[0]} strength={lora_strengths[0][l_idx]}"
-                                            if loras
-                                            else "",
-                                        )
-
-                                        t0 = time.time()
-                                        latent = sampler_adv.sample(
-                                            noise_node, guider, samp_obj, sigmas, latent_image
-                                        )[1]
-                                        elapsed = time.time() - t0
-
-                                        out_params.append(
+                                    record = {
+                                        "seed": s,
+                                        "sampler": samp_name,
+                                        "scheduler": sched_name,
+                                        "steps": st,
+                                        "guidance": cfg,
+                                        "denoise": dn,
+                                        "time": round(elapsed, 3),
+                                    }
+                                    if loras:
+                                        record.update(
                                             {
-                                                "time": elapsed,
-                                                "seed": seed_val,
-                                                "width": width,
-                                                "height": height,
-                                                "sampler": samp,
-                                                "scheduler": sched,
-                                                "steps": st,
-                                                "guidance": guidance_val,
-                                                "denoise": dn,
-                                                "prompt": prompt,
-                                                **(
-                                                    {
-                                                        "lora": lora_models[0],
-                                                        "lora_strength": lora_strengths[0][l_idx],
-                                                    }
-                                                    if loras
-                                                    else {}
-                                                ),
+                                                "lora": lora_models[0],
+                                                "lora_strength": lora_strengths[0][l_idx],
                                             }
                                         )
+                                    params_log.append(record)
 
-                                        out_latent = (
-                                            latent
-                                            if out_latent is None
-                                            else latentbatch.batch(out_latent, latent)[0]
-                                        )
+                                    latents_batched = (
+                                        latent if latents_batched is None else latent_batcher.batch(latents_batched, latent)[0]
+                                    )
 
-                                        if pbar:
-                                            pbar.update(1)
+                                    if pbar:
+                                        pbar.update(1)
 
-        return out_latent, out_params, out_sigmas
+        return latents_batched, params_log, last_sigmas
 
 
-# ────────────────────────────────────────────────────────────────────────────
-# Node registration
-# ────────────────────────────────────────────────────────────────────────────
-NODE_CLASS_MAPPINGS = {
-    "SdxlSamplerParams": SdxlSamplerParams,
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "SdxlSamplerParams": "SDXL/SD1.5 Sampler Params",
-}
+# -----------------------------------------------------------------------------
+# Registration dictionaries (ComfyUI)
+# -----------------------------------------------------------------------------
+NODE_CLASS_MAPPINGS = {"SdxlSamplerParams": SdxlSamplerParams}
+NODE_DISPLAY_NAME_MAPPINGS = {"SdxlSamplerParams": "SdxlSamplerParams (Gayrat)"}
